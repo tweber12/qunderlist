@@ -4,15 +4,19 @@ abstract class TodoRepository {
   Future<void> addTodoItem(TodoItem item, int listId);
   Future<void> updateTodoItem(TodoItem item);
   Future<void> deleteTodoItem(TodoItem item);
-  Stream<TodoItem> getTodoItem(int id);
+  Future<TodoItem> getTodoItem(int id);
 
   Future<void> addTodoList(TodoList list);
   Future<void> updateTodoList(TodoList list);
   Future<void> deleteTodoList(TodoList list);
   Future<void> moveList(TodoList list, int moveTo);
-  Stream<TodoList> getTodoList(int id);
-  Stream<List<int>> getTodoLists();
-  Stream<List<int>> getTodoItemsOfList(int listId, {TodoStatusFilter filter});
+  Future<TodoList> getTodoList(int id);
+  Future<int> getNumberOfTodoLists();
+  Future<List<int>> getTodoLists();
+  Future<List<TodoList>> getTodoListsChunk(int start, int end);
+  Future<int> getNumberOfItems(int listId, {TodoStatusFilter filter});
+  Future<List<int>> getTodoItemsOfList(int listId, {TodoStatusFilter filter});
+  Future<List<TodoItem>> getTodoItemsOfListChunk(int listId, int start, int end, {TodoStatusFilter filter});
 
   Future<void> addTodoItemToList(TodoItem item, int listId);
   Future<void> removeTodoItemFromList(TodoItem item, int listId);

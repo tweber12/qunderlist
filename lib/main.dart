@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:qunderlist/blocs/todo_lists.dart';
+import 'package:qunderlist/repository/todos_repository_sqflite.dart';
+import 'package:qunderlist/screens/todo_lists_screen.dart';
 
 void main() {
   runApp(MyApp());
@@ -26,7 +30,17 @@ class MyApp extends StatelessWidget {
         // closer together (more dense) than on mobile platforms.
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      home: PointlessHomePage(),
+    );
+  }
+}
+
+class PointlessHomePage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider<TodoListsBloc>(
+      create: (context) => TodoListsBloc(TodoRepositorySqflite.getInstance()),
+      child: TodoListsScreen(),
     );
   }
 }

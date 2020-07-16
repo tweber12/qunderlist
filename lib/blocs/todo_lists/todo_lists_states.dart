@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:qunderlist/repository/repository.dart';
 
 abstract class TodoListsStates with EquatableMixin {}
 
@@ -7,15 +8,15 @@ class TodoListsLoading extends TodoListsStates {
   List<Object> get props => [];
 }
 
-class TodoListsLoaded extends TodoListsStates {
-  final List<int> listOfLists;
-  TodoListsLoaded(this.listOfLists);
+class ChunkLoaded extends TodoListsStates {
+  final Chunk<TodoList> chunkOfLists;
+  ChunkLoaded(this.chunkOfLists);
 
   @override
-  List<Object> get props => [listOfLists];
+  List<Object> get props => [chunkOfLists];
 }
 
-class TodoListsLoadFailed extends TodoListsStates {
+class ChunkLoadFailed extends TodoListsStates {
   @override
   List<Object> get props => [];
 }

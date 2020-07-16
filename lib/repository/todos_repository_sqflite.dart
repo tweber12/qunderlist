@@ -43,7 +43,7 @@ class TodoRepositorySqflite implements TodoRepository {
     if (_repositorySqflite._db == null) {
       _repositorySqflite._db = getDatabasesPath().then((value) {
         var dbPath = join(value, _DEFAULT_DATABASE_NAME);
-        return openDatabase(dbPath, onCreate: createDatabase);
+        return openDatabase(dbPath, version: 1, onCreate: createDatabase);
       });
     }
     return _repositorySqflite;
@@ -81,7 +81,7 @@ class TodoRepositorySqflite implements TodoRepository {
   }
 
   @override
-  Stream<TodoItem> getTodoItem(int id) async* {
+  Future<TodoItem> getTodoItem(int id) async {
     var db = await _db;
     var results = await db.query(TODO_ITEMS_TABLE,
         columns: [
@@ -97,15 +97,11 @@ class TodoRepositorySqflite implements TodoRepository {
         where: "$ID = ?",
         whereArgs: [id]);
     if (results.isEmpty) {
-      yield null;
-      return;
+      return null;
     }
-    var reminders = await db.query(TODO_REMINDERS_TABLE,
-        columns: [TODO_REMINDER_TIME],
-        where: "$TODO_REMINDER_ITEM = ?",
-        whereArgs: [id]);
+    var reminders = await _getReminders(db, id);
     var todoItem = _todoItemFromRepresentation(results.first, reminders);
-    yield todoItem;
+    return todoItem;
   }
 
   @override
@@ -113,6 +109,7 @@ class TodoRepositorySqflite implements TodoRepository {
     var db = await _db;
     await db.transaction((txn) async{
       int ordering = await _lookupLastOrderingOfLists(txn);
+      print("next ordering: ${ordering+1}");
       await txn.insert(TODO_LISTS_TABLE, _todoListToRepresentation(list, ordering: ordering+1));
       _lastOrderingOfLists = ordering+1;
     });
@@ -127,16 +124,28 @@ class TodoRepositorySqflite implements TodoRepository {
 
   Future<void> deleteTodoList(TodoList list) async {
     var db = await _db;
+    // Restore ordering
     db.transaction((txn) async {
+      await txn.rawUpdate("""
+        update $TODO_LISTS_TABLE
+           set $TODO_LIST_ORDERING = $TODO_LIST_ORDERING-1
+         where $TODO_LIST_ORDERING > (select $TODO_LIST_ORDERING from $TODO_LISTS_TABLE where $ID=?);
+        """, [list.id]);
+      // Delete list
       await txn
           .delete(TODO_LISTS_TABLE, where: "$ID = ?", whereArgs: [list.id]);
+      // Reduce the stored number of lists by one
+      if (_lastOrderingOfLists != null) {
+        _lastOrderingOfLists -= 1;
+      }
+      // Delete connection between list and items
       await txn.delete(TODO_LIST_ITEMS_TABLE,
           where: "$TODO_LIST_ITEMS_LIST = ?", whereArgs: [list.id]);
+      // Delete now orphaned items
       await txn.rawQuery(
           """delete from $TODO_ITEMS_TABLE  where $ID in (select $ID from $TODO_ITEMS_TABLE left outer join $TODO_LIST_ITEMS_TABLE on $ID = $TODO_LIST_ITEMS_ITEM where $TODO_LIST_ITEMS_ITEM is null)""");
     });
   }
-
 
   @override
   Future<void> moveList(TodoList list, int moveTo) async {
@@ -167,58 +176,61 @@ class TodoRepositorySqflite implements TodoRepository {
   }
 
   @override
-  Stream<TodoList> getTodoList(int id) async* {
+  Future<TodoList> getTodoList(int id) async {
     var db = await _db;
     var results = await db.query(TODO_LISTS_TABLE,
         columns: [ID, TODO_LIST_NAME], where: "$ID = ?", whereArgs: [id]);
     if (results.isEmpty) {
-      yield null;
-      return;
+      return null;
     }
-    yield _todoListFromRepresentation(results.first);
+    return _todoListFromRepresentation(results.first);
   }
 
   @override
-  Stream<List<int>> getTodoLists() async* {
+  Future<int> getNumberOfTodoLists() async {
+    var db = await _db;
+    var results = await db.rawQuery("""select count($ID) from $TODO_LISTS_TABLE""");
+    if (results.isEmpty) {
+      return 0;
+    } else {
+      var num = results.first["count($ID)"];
+      return num ?? 0;
+    }
+  }
+
+  @override
+  Future<List<int>> getTodoLists() async {
     var db = await _db;
     var results = await db.query(TODO_LISTS_TABLE, columns: [ID], orderBy: "$TODO_LIST_ORDERING asc");
-    yield results.map((m) => m[ID] as int).toList();
+    return results.map((m) => m[ID] as int).toList();
   }
 
   @override
-  Stream<List<int>> getTodoItemsOfList(int listId,
-      {TodoStatusFilter filter = TodoStatusFilter.all}) async* {
-    String where = "$TODO_LIST_ITEMS_LIST = ?";
-    List<dynamic> whereArgs = [listId];
-    switch (filter) {
-      case TodoStatusFilter.all:
-        break;
-      case TodoStatusFilter.active:
-        where += "and $TODO_ITEM_COMPLETED = 0";
-        break;
-      case TodoStatusFilter.completed:
-        where += "and $TODO_ITEM_COMPLETED = 1";
-        break;
-      case TodoStatusFilter.important:
-        where +=
-            "and $TODO_ITEM_COMPLETED = 0 and $TODO_ITEM_PRIORITY = ${TodoPriority.high.index}";
-        break;
-      case TodoStatusFilter.withDueDate:
-        where +=
-            "and $TODO_ITEM_COMPLETED = 0 and $TODO_ITEM_DUE_DATE is not null";
-        break;
-    }
+  Future<List<TodoList>> getTodoListsChunk(int start, int end) async {
     var db = await _db;
-    var results = await db.rawQuery("""
-         select ($ID)
-           from $TODO_ITEMS_TABLE
-           join $TODO_LIST_ITEMS_TABLE
-             on $ID = $TODO_LIST_ITEMS_ITEM
-          where $where
-       order by $TODO_LIST_ITEMS_ORDERING
-            asc;
-    """, whereArgs);
-    yield results.map((m) => m[ID] as int).toList();
+    var results = await db.query(TODO_LISTS_TABLE, columns: [ID,TODO_LIST_NAME,TODO_LIST_ORDERING], orderBy: "$TODO_LIST_ORDERING asc", offset: start, limit: end-start);
+    return results.map((m) => _todoListFromRepresentation(m)).toList();
+  }
+
+  @override
+  Future<int> getNumberOfItems(int listId, {TodoStatusFilter filter: TodoStatusFilter.all}) async {
+    var db = await _db;
+    var result = await _ItemsQuery(listId: listId, filter: filter).getNumberOfItems(db);
+    return result;
+  }
+
+  @override
+  Future<List<int>> getTodoItemsOfList(int listId, {TodoStatusFilter filter = TodoStatusFilter.all}) async {
+    var db = await _db;
+    var result = await _ItemsQuery(listId: listId, filter: filter).getTodoItems(db);
+    return result;
+  }
+
+  @override
+  Future<List<TodoItem>> getTodoItemsOfListChunk(int listId, int start, int end, {TodoStatusFilter filter = TodoStatusFilter.all}) async {
+    var db = await _db;
+    var result = await _ItemsQuery(listId: listId, filter: filter, offset: start, limit: end-start).getChunkOfTodoItems(db);
+    return result;
   }
 
   @override
@@ -381,18 +393,20 @@ class TodoRepositorySqflite implements TodoRepository {
   }
 
   Future<int> _lookupLastOrderingOfLists(Transaction txn) async {
+    print("STORED: $_lastOrderingOfLists");
     if (_lastOrderingOfLists != null) {
       return _lastOrderingOfLists;
     }
     var results = await txn.rawQuery("""
-        select max($TODO_LIST_ORDERING)
+        select count($ID)
           from $TODO_LISTS_TABLE
       """);
     if (results.isEmpty) {
       _lastOrderingOfLists = 0;
     } else {
-      _lastOrderingOfLists = results.first["max($TODO_LIST_ITEMS_ORDERING)"] ?? 0;
+      _lastOrderingOfLists = results.first["count($ID)"] ?? 0;
     }
+    print("COUNTED: $_lastOrderingOfLists");
     return _lastOrderingOfLists;
   }
 
@@ -428,10 +442,7 @@ Map<String, dynamic> _todoItemToRepresentation(TodoItem item) {
 }
 
 TodoItem _todoItemFromRepresentation(
-    Map<String, dynamic> representation, List<Map<String, dynamic>> reminders) {
-  var remindersDates =
-      reminders.map((s) => DateTime.parse(s[TODO_REMINDER_TIME])).toList();
-  print(representation);
+    Map<String, dynamic> representation, List<DateTime> reminders) {
   return TodoItem(
     representation[TODO_ITEM_NAME],
     DateTime.parse(representation[TODO_ITEM_CREATED_DATE]),
@@ -445,7 +456,7 @@ TodoItem _todoItemFromRepresentation(
     completedOn: representation[TODO_ITEM_COMPLETED_DATE] == null
         ? null
         : DateTime.parse(representation[TODO_ITEM_COMPLETED_DATE]),
-    reminders: remindersDates,
+    reminders: reminders,
   );
 }
 
@@ -502,4 +513,141 @@ Future<void> createDatabase(Database db, int version) async {
       );
      """);
   });
+}
+
+Future<List<DateTime>> _getReminders(Database db, int itemId) async {
+  var results = await db.query(TODO_REMINDERS_TABLE,
+      columns: [TODO_REMINDER_TIME],
+      where: "$TODO_REMINDER_ITEM = ?",
+      whereArgs: [itemId]);
+  return results.map((m) => DateTime.parse(m[TODO_REMINDER_TIME]));
+}
+
+class _ItemsQuery {
+  final int listId;
+  final bool onList;
+  final String where;
+  final List<dynamic> whereArgs;
+  final String ordering;
+  final String orderingDirection;
+  final int offset;
+  final String amount;
+
+  _ItemsQuery({this.listId, filter: TodoStatusFilter.all, ordering: TodoListOrdering.custom, direction: TodoListOrderingDirection.ascending, this.offset=0, int limit}):
+      onList = listId != null,
+      where = buildWhere(filter),
+      whereArgs = buildWhereArgs(filter),
+      ordering = buildOrdering(listId, ordering),
+      orderingDirection = buildOrderingDirection(direction),
+      amount = buildAmount(offset, limit);
+
+  Future<int> getNumberOfItems(Database db) async {
+    String resultColumns = "count($ID)";
+    var results = await query(db, resultColumns);
+    if (results.isEmpty) {
+      return 0;
+    } else {
+      return results.first[resultColumns] ?? 0;
+    }
+  }
+  Future<List<int>> getTodoItems(Database db) async {
+    String resultColumns = ID;
+    var results = await query(db, resultColumns);
+    return results.map((m) => m[resultColumns] as int).toList();
+  }
+  Future<List<TodoItem>> getChunkOfTodoItems(Database db) async {
+    String resultColumns = [
+      ID,
+      TODO_ITEM_NAME,
+      TODO_ITEM_COMPLETED,
+      TODO_ITEM_PRIORITY,
+      TODO_ITEM_NOTE,
+      TODO_ITEM_DUE_DATE,
+      TODO_ITEM_CREATED_DATE,
+      TODO_ITEM_COMPLETED_DATE
+    ].join(", ");
+    var results = await query(db, resultColumns);
+    List<TodoItem> items = [];
+    for (final result in results) {
+      var id = result[ID];
+      var reminders = await _getReminders(db, id);
+      items.add(_todoItemFromRepresentation(result, reminders));
+    }
+    return items;
+  }
+
+  Future<List<Map<String,dynamic>>> query(Database db, String resultColumns) async {
+    if (onList) {
+      return await db.rawQuery("""
+               select ($resultColumns)
+                 from $TODO_ITEMS_TABLE
+                 join $TODO_LIST_ITEMS_TABLE
+                   on $ID = $TODO_LIST_ITEMS_ITEM
+                where $TODO_LIST_ITEMS_LIST = ? and $where
+             order by $ordering $orderingDirection
+                      $amount; 
+        """, [listId]+whereArgs);
+    } else {
+      return await db.rawQuery("""
+               select ($resultColumns)
+                 from $TODO_ITEMS_TABLE
+                where $where
+             order by $ordering $orderingDirection
+                      $amount; 
+        """, whereArgs);
+    }
+  }
+
+  static String buildWhere(TodoStatusFilter filter){
+    String whereBuild;
+    switch (filter) {
+        case TodoStatusFilter.all:
+          break;
+        case TodoStatusFilter.active:
+          whereBuild = "$TODO_ITEM_COMPLETED = 0";
+          break;
+        case TodoStatusFilter.completed:
+          whereBuild = "$TODO_ITEM_COMPLETED = 1";
+          break;
+        case TodoStatusFilter.important:
+          whereBuild =
+          "$TODO_ITEM_COMPLETED = 0 and $TODO_ITEM_PRIORITY = ${TodoPriority.high.index}";
+          break;
+        case TodoStatusFilter.withDueDate:
+          whereBuild =
+          "$TODO_ITEM_COMPLETED = 0 and $TODO_ITEM_DUE_DATE is not null";
+          break;
+    }
+    return whereBuild;
+  }
+  static List<dynamic> buildWhereArgs(TodoStatusFilter filter) {
+    List<dynamic> whereArgsBuild = [];
+    return whereArgsBuild;
+  }
+  static String buildOrdering(int listId, TodoListOrdering ordering) {
+    var order = (listId == null && ordering == TodoListOrdering.custom) ? TodoListOrdering.byDate : ordering;
+    switch (order) {
+      case TodoListOrdering.custom: return TODO_LIST_ITEMS_ORDERING;
+      case TodoListOrdering.byDate: return TODO_ITEM_CREATED_DATE;
+      case TodoListOrdering.alphabetical: return TODO_ITEM_NAME;
+      default: throw "BUG: Unhandled ordering of todo items!";
+    }
+  }
+  static String buildOrderingDirection(TodoListOrderingDirection direction) {
+    switch (direction) {
+      case TodoListOrderingDirection.ascending: return "asc";
+      case TodoListOrderingDirection.descending: return "dsc";
+      default: throw "BUG: Unhandled ordering direction for todo items!";
+    }
+  }
+  static String buildAmount(int offset, int limit) {
+    var amount = "";
+    if (offset != 0) {
+      amount += " offset = $offset ";
+    }
+    if (limit != null) {
+      amount += " limit = $limit";
+    }
+    return amount;
+  }
 }
