@@ -46,6 +46,8 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
   }
 
   Stream<TodoListsStates> _mapReorderTodoListsEventToState(ReorderTodoListsEvent event) async* {
+    // The database uses 1 based indices
+    await _repository.moveList(event.list, event.moveTo+1);
     yield* _loadChunk(event.chunkFrom, event.chunkTo, fromBottom: event.fromBottom);
   }
 

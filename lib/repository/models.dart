@@ -20,6 +20,20 @@ class TodoItem {
 
   TodoItem(this.todo, this.createdOn, {this.id, this.completed = false, this.completedOn, this.priority = TodoPriority.none, this.note, this.dueDate, reminders}):
       this.reminders = reminders ?? [];
+
+  TodoItem copyWith({String todo, bool completed, TodoPriority priority, String note, DateTime dueDate, DateTime createdOn, DateTime completedOn, List<DateTime> reminders, bool deleteDueDate=false}) {
+    return TodoItem(
+      todo ?? this.todo,
+      createdOn ?? this.createdOn,
+      id: this.id,
+      completed: completed ?? this.completed,
+      priority: priority ?? this.priority,
+      note: note ?? this.note,
+      dueDate: dueDate!=null || deleteDueDate ? dueDate : this.dueDate,
+      completedOn: completedOn ?? this.completedOn,
+      reminders: reminders ?? this.reminders,
+    );
+  }
 }
 
 enum TodoStatusFilter {
@@ -40,11 +54,14 @@ enum TodoListOrderingDirection {
   descending,
 }
 
-class TodoList {
+class TodoList with EquatableMixin {
   final int id;
   final String listName;
 
   TodoList(this.listName, {this.id});
+
+  @override
+  List<Object> get props => [id, listName];
 }
 
 class Chunk<T> with EquatableMixin {

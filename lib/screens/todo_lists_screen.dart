@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_reorderable_list/flutter_reorderable_list.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
+import 'package:qunderlist/screens/todo_list_screen.dart';
 
 class TodoListsScreen extends StatelessWidget {
   final list = TodoListsListView();
@@ -39,12 +40,13 @@ class TodoListsListView extends StatefulWidget {
   }
 }
 class _TodoListsListViewState extends State<TodoListsListView> {
-  int currentLength;
   TodoListsBloc bloc;
   ScrollController scrollController;
-  int chunkFrom;
-  int chunkTo;
+  Chunk<TodoList> currentChunk;
   bool loading;
+  bool swap;
+  int swapFrom;
+  int swapTo;
 
   @override
   void initState() {
@@ -53,7 +55,8 @@ class _TodoListsListViewState extends State<TodoListsListView> {
     scrollController.addListener(scroller);
     bloc = BlocProvider.of<TodoListsBloc>(context);
     bloc.add(GetChunkEvent(0,50));
-    currentLength = 0;
+    swap = false;
+    loading = false;
   }
 
   @override
@@ -68,27 +71,55 @@ class _TodoListsListViewState extends State<TodoListsListView> {
       }
       if (state is ChunkLoaded) {
         loading = false;
-        Chunk<TodoList> chunk = state.chunkOfLists;
-        currentLength = chunk.totalLength;
-        chunkTo = chunk.end;
-        chunkFrom = chunk.start;
-        return ListView.builder(
-          itemBuilder: (BuildContext context, int index) {
-            print("Index: $index");
-            if (index >= chunk.end || index < chunk.start) {
-              if (!loading) {
-                print("Loading, $index, $currentLength, ${chunk.start}, ${chunk.end}");
-                BlocProvider.of<TodoListsBloc>(context).add(GetChunkEvent(index-15, index+15));
-                loading = true;
+        currentChunk = state.chunkOfLists;
+        return ReorderableList(
+          onReorder: (Key movingItem, Key movedTo) {
+            setState(() {
+              swapFrom = currentChunk.data.indexWhere((element) => Key("Reorderable TodoList Item: ${element.id}") == movingItem) + currentChunk.start;
+              var swapToNew = currentChunk.data.indexWhere((element) => Key("Reorderable TodoList Item: ${element.id}") == movedTo) + currentChunk.start;
+              if (swapToNew == swapTo) {
+                // The item is dragged back in the direction of it's original position
+                swapTo = swapTo > swapFrom ? swapTo - 1 : swapTo + 1;
+              } else {
+                swapTo = swapToNew;
               }
-              return Center(child: CircularProgressIndicator());
-            } else {
-              return TodoListsListItem(index, chunk.get(index));
-            }
-          },
-          itemCount: state.chunkOfLists.totalLength,
-          itemExtent: widget.itemExtent,
-          controller: scrollController,
+              swap = true;
+            });
+            return true;
+            },
+          onReorderDone: (_) {
+              bloc.add(ReorderTodoListsEvent(swapTo-25, swapTo+25, currentChunk.get(swapFrom), swapTo));
+              swap = false;
+            },
+          child: ListView.builder(
+            itemBuilder: (BuildContext context, int index) {
+              if (swap) {
+//                print("$swapFrom, $swapTo: $index");
+                if (index == swapTo) {
+                  index = swapFrom;
+                } else if (swapFrom > swapTo && swapFrom >= index && swapTo < index) {
+                  index = index -= 1;
+                } else if (swapFrom < swapTo && swapFrom <= index && swapTo > index) {
+                  index = index += 1;
+                }
+//                print(" => $index");
+              }
+//              print("Index: $index");
+              if (index >= currentChunk.end || index < currentChunk.start) {
+                if (!loading) {
+                  print("Loading, $index, ${currentChunk.totalLength}, ${currentChunk.start}, ${currentChunk.end}");
+                  BlocProvider.of<TodoListsBloc>(context).add(GetChunkEvent(index-15, index+15));
+                  loading = true;
+                }
+                return Center(child: CircularProgressIndicator());
+              } else {
+                return TodoListsListItem(index, currentChunk.get(index));
+              }
+            },
+            itemCount: state.chunkOfLists.totalLength,
+            itemExtent: widget.itemExtent,
+            controller: scrollController,
+          ),
         );
       }
       throw "BUG: Failed to handle todolists state!";
@@ -98,14 +129,14 @@ class _TodoListsListViewState extends State<TodoListsListView> {
   void scroller() {
     var position = scrollController.position;
     var firstVisibleItem = (position.pixels / widget.itemExtent).floor();
-    var lastVisibleItem = currentLength - 1 - ((position.maxScrollExtent-position.pixels) / widget.itemExtent).floor();
-    var bufferedAbove = firstVisibleItem-chunkFrom;
-    var bufferedBelow = chunkTo-1-lastVisibleItem;
-    if (!loading && bufferedAbove < 10 && chunkFrom != 0) {
+    var lastVisibleItem = currentChunk.totalLength - 1 - ((position.maxScrollExtent-position.pixels) / widget.itemExtent).floor();
+    var bufferedAbove = firstVisibleItem-currentChunk.start;
+    var bufferedBelow = currentChunk.end-1-lastVisibleItem;
+    if (!loading && bufferedAbove < 10 && currentChunk.start != 0) {
       bloc.add(GetChunkEvent(firstVisibleItem-15, lastVisibleItem+15));
       loading = true;
     }
-    if (!loading && bufferedBelow < 10 && chunkTo != currentLength) {
+    if (!loading && bufferedBelow < 10 && currentChunk.end != currentChunk.totalLength) {
       bloc.add(GetChunkEvent(firstVisibleItem-15, lastVisibleItem+15));
       loading = true;
     }
@@ -120,15 +151,25 @@ class TodoListsListItem extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    return Dismissible(
-        key: Key(list.id.toString()),
-        child: ListTile(title: Text(list.listName)),
-        onDismissed: (_) {
-          BlocProvider.of<TodoListsBloc>(context).add(TodoListDeletedEvent(index-25, index+25, list));
-          Scaffold.of(context).showSnackBar(SnackBar(content: Text("Deleted list '${list.listName}'")));
-          },
-        background: Container( color: Colors.red, child: ListTile(leading: Icon(Icons.delete, color: Colors.white),title: Text("Delete list", style: TextStyle(color: Colors.white),)),),
-        confirmDismiss: (_) => showDialog(context: context, builder: (context) => ConfirmDeleteDialog(title: "Delete list '${list.listName}'?", subtitle: "This action cannot be undone!")),
+    return ReorderableItem(
+      key: Key("Reorderable TodoList Item: ${list.id}"),
+      childBuilder: (context, reorderState) {
+        if (reorderState == ReorderableItemState.placeholder) {
+          return Container();
+        }
+        return DelayedReorderableListener(
+          child: Dismissible(
+            key: Key(list.id.toString()),
+            child: ListTile(title: Text(list.listName), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => showTodoListScreen(context, list))),),
+            onDismissed: (_) {
+              BlocProvider.of<TodoListsBloc>(context).add(TodoListDeletedEvent(index-25, index+25, list));
+              Scaffold.of(context).showSnackBar(SnackBar(content: Text("Deleted list '${list.listName}'")));
+            },
+            background: Container( color: Colors.red, child: ListTile(leading: Icon(Icons.delete, color: Colors.white),title: Text("Delete list", style: TextStyle(color: Colors.white),)),),
+            confirmDismiss: (_) => showDialog(context: context, builder: (context) => ConfirmDeleteDialog(title: "Delete list '${list.listName}'?", subtitle: "This action cannot be undone!")),
+          )
+        );
+      },
     );
   }
 }

@@ -54,7 +54,7 @@ class TodoRepositorySqflite implements TodoRepository {
   @override
   Future<void> addTodoItem(TodoItem item, int listId) async {
     var db = await _db;
-    db.transaction((txn) async {
+    await db.transaction((txn) async {
       var id =
           await txn.insert(TODO_ITEMS_TABLE, _todoItemToRepresentation(item));
       await _addReminders(id, item.reminders, txn: txn);
@@ -65,7 +65,7 @@ class TodoRepositorySqflite implements TodoRepository {
   @override
   Future<void> updateTodoItem(TodoItem item) async {
     var db = await _db;
-    db.transaction((txn) async {
+    await db.transaction((txn) async {
       await txn.update(TODO_ITEMS_TABLE, _todoItemToRepresentation(item),
           where: "$ID = ?", whereArgs: [item.id]);
       await _updateReminders(item.id, item.reminders, txn: txn);
@@ -73,9 +73,18 @@ class TodoRepositorySqflite implements TodoRepository {
   }
 
   @override
+  Future<void> completeTodoItem(TodoItem item) async {
+    var db = await _db;
+    var completedDate = item.completed ? null : DateTime.now().toIso8601String();
+    await db.transaction((txn) async {
+      await txn.update(TODO_ITEMS_TABLE, {TODO_ITEM_COMPLETED: item.completed ? 0 : 1, TODO_ITEM_COMPLETED_DATE: completedDate}, where: "$ID = ?", whereArgs: [item.id]);
+    });
+  }
+
+  @override
   Future<void> deleteTodoItem(TodoItem item) async {
     var db = await _db;
-    db.transaction((txn) async {
+    await db.transaction((txn) async {
       _deleteTodoItem(item.id, txn);
     });
   }
@@ -125,7 +134,7 @@ class TodoRepositorySqflite implements TodoRepository {
   Future<void> deleteTodoList(TodoList list) async {
     var db = await _db;
     // Restore ordering
-    db.transaction((txn) async {
+    await db.transaction((txn) async {
       await txn.rawUpdate("""
         update $TODO_LISTS_TABLE
            set $TODO_LIST_ORDERING = $TODO_LIST_ORDERING-1
@@ -150,24 +159,25 @@ class TodoRepositorySqflite implements TodoRepository {
   @override
   Future<void> moveList(TodoList list, int moveTo) async {
     var db = await _db;
-    db.transaction((txn) async {
+    await db.transaction((txn) async {
       var ordering = await txn.query(TODO_LISTS_TABLE,
           columns: [TODO_LIST_ORDERING],
           where: "$ID = ?",
           whereArgs: [list.id]);
       var position = ordering.first[TODO_LIST_ORDERING];
+      print("MOVE $position => $moveTo");
       if (position > moveTo) {
         await txn.rawUpdate("""
             update $TODO_LISTS_TABLE
                set $TODO_LIST_ORDERING = $TODO_LIST_ORDERING+1
-             where $TODO_LIST_ORDERING > ? and $TODO_LIST_ORDERING <= ?;
+             where $TODO_LIST_ORDERING < ? and $TODO_LIST_ORDERING >= ?;
           """, [position, moveTo]);
       } else if (position < moveTo) {
         await txn.rawUpdate("""
             update $TODO_LISTS_TABLE
                set $TODO_LIST_ORDERING = $TODO_LIST_ORDERING-1
-             where $TODO_LIST_ORDERING >= ? and $TODO_LIST_ORDERING < ?;
-          """, [moveTo, position]);
+             where $TODO_LIST_ORDERING > ? and $TODO_LIST_ORDERING <= ?;
+          """, [position, moveTo]);
       }
       await txn.update(
           TODO_LISTS_TABLE, {TODO_LIST_ORDERING: moveTo},
@@ -209,6 +219,9 @@ class TodoRepositorySqflite implements TodoRepository {
   Future<List<TodoList>> getTodoListsChunk(int start, int end) async {
     var db = await _db;
     var results = await db.query(TODO_LISTS_TABLE, columns: [ID,TODO_LIST_NAME,TODO_LIST_ORDERING], orderBy: "$TODO_LIST_ORDERING asc", offset: start, limit: end-start);
+    for (final r in results) {
+      print("ORDERING ${r[TODO_LIST_NAME]} => ${r[TODO_LIST_ORDERING]}");
+    }
     return results.map((m) => _todoListFromRepresentation(m)).toList();
   }
 
@@ -234,6 +247,21 @@ class TodoRepositorySqflite implements TodoRepository {
   }
 
   @override
+  Future<List<TodoList>> getListsOfItem(int itemId) async {
+    var db = await _db;
+    var results = await db.rawQuery("""
+          select $ID, $TODO_LIST_NAME
+            from $TODO_LISTS_TABLE
+            join $TODO_LIST_ITEMS_TABLE
+              on $ID = $TODO_LIST_ITEMS_LIST
+           where $TODO_LIST_ITEMS_ITEM = ?
+        order by $TODO_LIST_ORDERING asc;
+      """,
+      [itemId]);
+    return results.map((m) => _todoListFromRepresentation(m)).toList();
+  }
+
+  @override
   Future<void> addTodoItemToList(TodoItem item, int listId) async {
     _addTodoItemToList(listId, item.id);
   }
@@ -241,7 +269,7 @@ class TodoRepositorySqflite implements TodoRepository {
   @override
   Future<void> removeTodoItemFromList(TodoItem item, int listId) async {
     var db = await _db;
-    db.transaction((txn) async {
+    await db.transaction((txn) async {
       await _removeTodoItemFromList(txn, listId, item.id, recursive: true);
     });
   }
@@ -250,7 +278,7 @@ class TodoRepositorySqflite implements TodoRepository {
   Future<void> moveTodoItemToList(
       TodoItem item, int oldListId, int newListId) async {
     var db = await _db;
-    db.transaction((txn) async {
+    await db.transaction((txn) async {
       await _removeTodoItemFromList(txn, oldListId, item.id);
       await _addTodoItemToList(newListId, item.id, txn: txn);
     });
@@ -259,7 +287,7 @@ class TodoRepositorySqflite implements TodoRepository {
   @override
   Future<void> moveItemInList(TodoItem item, int listId, int moveTo) async {
     var db = await _db;
-    db.transaction((txn) async {
+    await db.transaction((txn) async {
       var ordering = await txn.query(TODO_LIST_ITEMS_TABLE,
           columns: [TODO_LIST_ITEMS_ORDERING],
           where: "$TODO_LIST_ITEMS_ITEM = ?",
@@ -374,7 +402,7 @@ class TodoRepositorySqflite implements TodoRepository {
       {Transaction txn}) async {
     if (txn == null) {
       var db = await _db;
-      db.transaction((txn) => _updateRemindersTxn(txn, itemId, reminders));
+      await db.transaction((txn) => _updateRemindersTxn(txn, itemId, reminders));
     } else {
       _updateRemindersTxn(txn, itemId, reminders);
     }
@@ -520,14 +548,14 @@ Future<List<DateTime>> _getReminders(Database db, int itemId) async {
       columns: [TODO_REMINDER_TIME],
       where: "$TODO_REMINDER_ITEM = ?",
       whereArgs: [itemId]);
-  return results.map((m) => DateTime.parse(m[TODO_REMINDER_TIME]));
+  return results.map((m) => DateTime.parse(m[TODO_REMINDER_TIME])).toList();
 }
 
 class _ItemsQuery {
   final int listId;
   final bool onList;
   final String where;
-  final List<dynamic> whereArgs;
+  final List<String> whereArgs;
   final String ordering;
   final String orderingDirection;
   final int offset;
@@ -556,6 +584,7 @@ class _ItemsQuery {
     return results.map((m) => m[resultColumns] as int).toList();
   }
   Future<List<TodoItem>> getChunkOfTodoItems(Database db) async {
+    print("CHUNK: $where");
     String resultColumns = [
       ID,
       TODO_ITEM_NAME,
@@ -571,6 +600,7 @@ class _ItemsQuery {
     for (final result in results) {
       var id = result[ID];
       var reminders = await _getReminders(db, id);
+//      List<DateTime> reminders = [];
       items.add(_todoItemFromRepresentation(result, reminders));
     }
     return items;
@@ -579,14 +609,14 @@ class _ItemsQuery {
   Future<List<Map<String,dynamic>>> query(Database db, String resultColumns) async {
     if (onList) {
       return await db.rawQuery("""
-               select ($resultColumns)
+               select $resultColumns
                  from $TODO_ITEMS_TABLE
                  join $TODO_LIST_ITEMS_TABLE
                    on $ID = $TODO_LIST_ITEMS_ITEM
                 where $TODO_LIST_ITEMS_LIST = ? and $where
              order by $ordering $orderingDirection
-                      $amount; 
-        """, [listId]+whereArgs);
+                      $amount;
+        """, [listId.toString()]+whereArgs);
     } else {
       return await db.rawQuery("""
                select ($resultColumns)
@@ -620,8 +650,8 @@ class _ItemsQuery {
     }
     return whereBuild;
   }
-  static List<dynamic> buildWhereArgs(TodoStatusFilter filter) {
-    List<dynamic> whereArgsBuild = [];
+  static List<String> buildWhereArgs(TodoStatusFilter filter) {
+    List<String> whereArgsBuild = [];
     return whereArgsBuild;
   }
   static String buildOrdering(int listId, TodoListOrdering ordering) {
@@ -643,10 +673,10 @@ class _ItemsQuery {
   static String buildAmount(int offset, int limit) {
     var amount = "";
     if (offset != 0) {
-      amount += " offset = $offset ";
+      amount += " offset $offset ";
     }
     if (limit != null) {
-      amount += " limit = $limit";
+      amount += " limit $limit";
     }
     return amount;
   }

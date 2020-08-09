@@ -2,6 +2,7 @@ import 'package:qunderlist/repository/models.dart';
 
 abstract class TodoRepository {
   Future<void> addTodoItem(TodoItem item, int listId);
+  Future<void> completeTodoItem(TodoItem item);
   Future<void> updateTodoItem(TodoItem item);
   Future<void> deleteTodoItem(TodoItem item);
   Future<TodoItem> getTodoItem(int id);
@@ -17,6 +18,7 @@ abstract class TodoRepository {
   Future<int> getNumberOfItems(int listId, {TodoStatusFilter filter});
   Future<List<int>> getTodoItemsOfList(int listId, {TodoStatusFilter filter});
   Future<List<TodoItem>> getTodoItemsOfListChunk(int listId, int start, int end, {TodoStatusFilter filter});
+  Future<List<TodoList>> getListsOfItem(int itemId);
 
   Future<void> addTodoItemToList(TodoItem item, int listId);
   Future<void> removeTodoItemFromList(TodoItem item, int listId);
