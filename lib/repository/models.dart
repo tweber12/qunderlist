@@ -70,6 +70,11 @@ class TodoList with EquatableMixin {
 
   @override
   List<Object> get props => [id, listName];
+
+  TodoList withId(int id) {
+    assert(this.id == null);
+    return TodoList(listName, id: id);
+  }
 }
 
 class Chunk<T> with EquatableMixin {

@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:bloc/bloc.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_lists/todo_lists_events.dart';
@@ -35,9 +33,9 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
   }
 
   Stream<TodoListsStates> _mapTodoListAddedEventToState(TodoListAddedEvent event) async* {
-    cache = cache.addElement(cache.totalNumberOfItems, event.list);
+    int id = await _repository.addTodoList(event.list);
+    cache = cache.addElement(cache.totalNumberOfItems, event.list.withId(id));
     yield TodoListsLoaded(cache);
-    await _repository.addTodoList(event.list);
   }
 
   Stream<TodoListsStates> _mapTodoListDeletedEventToState(TodoListDeletedEvent event) async* {

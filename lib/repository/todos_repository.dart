@@ -7,7 +7,7 @@ abstract class TodoRepository {
   Future<void> deleteTodoItem(TodoItem item);
   Future<TodoItem> getTodoItem(int id);
 
-  Future<void> addTodoList(TodoList list);
+  Future<int> addTodoList(TodoList list);
   Future<void> updateTodoList(TodoList list);
   Future<void> deleteTodoList(TodoList list);
   Future<void> moveList(TodoList list, int moveTo);

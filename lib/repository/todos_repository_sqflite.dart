@@ -115,13 +115,14 @@ class TodoRepositorySqflite implements TodoRepository {
   }
 
   @override
-  Future<void> addTodoList(TodoList list) async {
+  Future<int> addTodoList(TodoList list) async {
     var db = await _db;
-    await db.transaction((txn) async{
+    return db.transaction((txn) async{
       int ordering = await _lookupLastOrderingOfLists(txn);
       print("next ordering: ${ordering+1}");
-      await txn.insert(TODO_LISTS_TABLE, _todoListToRepresentation(list, ordering: ordering+1));
+      int id = await txn.insert(TODO_LISTS_TABLE, _todoListToRepresentation(list, ordering: ordering+1));
       _lastOrderingOfLists = ordering+1;
+      return id;
     });
   }
 
