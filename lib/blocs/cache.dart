@@ -32,6 +32,7 @@ class ListCache<T> {
   Mutex loadingChunk;
 
   T operator[] (int index) {
+    print("[] => $index, $currentChunkIndex, ${chain.length}");
     if (index < chainStart || index >= chainEnd) {
       return null;
     }
@@ -84,16 +85,18 @@ class ListCache<T> {
     var chunk = chain.elementAt(currentChunkIndex);
     if (chunk.start > index) {
       for (int i=currentChunkIndex-1; i>=0; i--) {
-        if (chain.elementAt(i).start < index) {
+        if (chain.elementAt(i).start <= index) {
           return i;
         }
       }
+      throw("BUG: Somehow the chain got corrupted");
     } else if (chunk.end <= index) {
       for (int i=currentChunkIndex+1; i<chain.length; i++) {
         if (chain.elementAt(i).end > index) {
           return i;
         }
       }
+      throw("BUG: Somehow the chain got corrupted");
     } else {
       return currentChunkIndex;
     }
@@ -200,7 +203,7 @@ class ListCache<T> {
     if (index == chainEnd) {
       // Inserting at the end of the chain. This is a bit of a special case, because usually this means that the cache can remain unchanged
       var newChunk = chain.last.addElement(index, element);
-      return _withNewChunk(chain.length, newChunk, shift: 1);
+      return _withNewChunk(chain.length-1, newChunk, shift: 1);
     }
     return _modifyChain(index, (chunk) => chunk.addElement(index, element), 1);
   }
@@ -223,8 +226,11 @@ class ListCache<T> {
   ListCache<T> _modifyChain(int index, Chunk<T> Function(Chunk<T>) modder, int shift) {
     print("MODIFY CHAIN: $index, $shift, $chainStart, $chainEnd");
     if (index >= chainEnd) {
-      // The element to modify is not contained in the cache, so there's nothing to do
-      return this;
+      // The element to modify is not contained in the cache, so there's nothing to do except modifying the total number of items
+      if (shift == 0) {
+        return this;
+      }
+      return ListCache.reInit(underlyingData, totalNumberOfItems+shift, chunkSize, numberOfChunks, chainStart, chainEnd, chain, currentChunkIndex);
     } else if (index < chainStart) {
       // The element is not contained in the cache, but appears before the loaded segment, so that indices can be shifted
       if (shift == 0) {
@@ -241,7 +247,8 @@ class ListCache<T> {
   }
 
   ListCache<T> _withNewChunk(int chunkIndex, Chunk<T> newChunk, {int shift=0}) {
-    var newChain;
+    ListQueue<Chunk<T>> newChain;
+    print("WITH NEW CHUNK: ${newChunk.length}, $chunkSize, ${chunkSize*2}, ${chunkSize~/2}");
     if (newChunk.length > chunkSize*2) {
       // The chunk is too large, split it in two
       newChain = _splitChunk(chunkIndex, newChunk, shift: shift);
@@ -251,35 +258,67 @@ class ListCache<T> {
     } else {
       // The size of the chunk is fine, no need to do anything with it
       newChain = ListQueue.of([
-        ...chain.take(max(chunkIndex - 1,0)),
+        ...chain.take(chunkIndex),
         newChunk,
         ...chain.skip(chunkIndex + 1).map((elem) => elem.shift(shift))
       ]);
     }
-    return ListCache.reInit(underlyingData, totalNumberOfItems+shift, chunkSize, numberOfChunks, chainStart, chainEnd+shift, newChain, currentChunkIndex);
+    return ListCache.reInit(
+        underlyingData,
+        totalNumberOfItems + shift,
+        chunkSize,
+        numberOfChunks,
+        newChain.first.start,
+        newChain.last.end,
+        newChain,
+        currentChunkIndex>=newChain.length ? currentChunkIndex-1 : currentChunkIndex
+    );
   }
 
   ListQueue<Chunk<T>> _splitChunk(int chunkIndex, Chunk<T> newChunk, {int shift=0}) {
     print("SPLITTING CHUNK");
-    int skipFront = chain.length == numberOfChunks && chunkIndex*2 > numberOfChunks ? 1 : 0;
-    return ListQueue.of([
-      ...chain.take(max(chunkIndex-1,0)).skip(skipFront),
+    int skipFront = chain.length == numberOfChunks && currentChunkIndex*2 > numberOfChunks ? 1 : 0;
+    var newChain = ListQueue.of([
+      // Everything in front of the chunk to be split. If necessary, drop the first element.
+      ...chain.take(chunkIndex),
+      // The chunk that has been split
       ...newChunk.split(),
-      ...chain.take(numberOfChunks-skipFront).skip(chunkIndex+1).map((elem) => elem.shift(shift))
+      // Everything after the split chunk, shifted over
+      ...chain.skip(chunkIndex+1).map((elem) => elem.shift(shift))
     ]);
+    if (newChain.length > numberOfChunks) {
+      // The newly created chain is too long
+      if (currentChunkIndex*2 > numberOfChunks) {
+        // The current chunk is in the top half of the chain => drop an element at the front
+        newChain.removeFirst();
+      } else {
+        newChain.removeLast();
+      }
+    }
+    return newChain;
   }
 
   ListQueue<Chunk<T>> _mergeChunk(int chunkIndex, Chunk<T> newChunk, {int shift=0}) {
+    print("MERGING CHUNKS");
+    // The chunk to merge with is found by checking (if both sides are available) which of the two candidates contains less elements
     if (chunkIndex==0 || (chunkIndex!=chain.length-1 && chain.elementAt(chunkIndex-1).length > chain.elementAt(chunkIndex+1).length)) {
+      // The chunk to merge with is to the right of the modified chunk
       return ListQueue.of([
-        ...chain.take(max(chunkIndex - 1,0)),
+        // Everything ahead of the modified chunk
+        ...chain.take(chunkIndex),
+        // The combined chunk
         Chunk.joined(newChunk, chain.elementAt(chunkIndex+1)),
+        // Everything after the modified chunk and the chunk it was joined with
         ...chain.skip(chunkIndex + 2).map((elem) => elem.shift(shift))
       ]);
     } else {
+      // The chunk to merge with is to the left of the modified chunk
       return ListQueue.of([
-        ...chain.take(max(chunkIndex - 2,0)),
+        // Everything to the left of the modified chunk, leaving out the one directly to the left
+        ...chain.take(chunkIndex - 1),
+        // The combined chunk
         Chunk.joined(chain.elementAt(chunkIndex - 1), newChunk),
+        // Everything after the modified chunk
         ...chain.skip(chunkIndex + 1).map((elem) => elem.shift(shift))
       ]);
     }
