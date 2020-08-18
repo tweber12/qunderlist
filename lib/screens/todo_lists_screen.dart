@@ -1,198 +1,91 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_reorderable_list/flutter_reorderable_list.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
+import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/screens/todo_list_screen.dart';
 
 class TodoListsScreen extends StatelessWidget {
-  final list = TodoListsListView();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Qunderlist"),),
-      body: list,
+      body: BlocBuilder<TodoListsBloc,TodoListsStates>(
+          builder: (context, state) {
+            if (state is TodoListsLoading) {
+              return LinearProgressIndicator();
+            } else if (state is TodoListsLoadingFailed) {
+              return Center(child: Text("Failed to load lists"));
+            } else if (state is TodoListsLoaded) {
+              return TodoListsListView(state);
+            } else {
+              throw "BUG: Unexpected state in TodoListsScreen: $state";
+            }
+          }
+      ),
       floatingActionButton: FloatingActionButton(
         child: Icon(Icons.add),
         onPressed: () async {
-          var added = await showModalBottomSheet<bool>(context: context, builder: (_) => TodoListAdder(BlocProvider.of<TodoListsBloc>(context)));
-          if (added) {
-            list.scrollToBottom();
-          }
-          },
+          await showModalBottomSheet<bool>(context: context, builder: (_) => TodoListAdder(BlocProvider.of<TodoListsBloc>(context)));
+        },
       ),
     );
   }
 }
 
 class TodoListsListView extends StatefulWidget {
-  final scrollController = ScrollController();
-  final double itemExtent = 60;
+  final TodoListsLoaded state;
+  TodoListsListView(this.state);
 
   @override
-  State<StatefulWidget> createState() {
-    return _TodoListsListViewState();
-  }
-
-  void scrollToBottom() {
-    print("Scrolling");
-    scrollController.jumpTo(scrollController.position.maxScrollExtent);
-  }
+  _TodoListsListViewState createState() => _TodoListsListViewState();
 }
+
 class _TodoListsListViewState extends State<TodoListsListView> {
-  TodoListsBloc bloc;
-  ScrollController scrollController;
-  Chunk<TodoList> currentChunk;
-  bool loading;
-  bool swap;
-  int swapFrom;
-  int swapTo;
+  TodoListsBloc _bloc;
 
   @override
   void initState() {
+    _bloc = BlocProvider.of(context);
     super.initState();
-    scrollController = ScrollController();
-    scrollController.addListener(scroller);
-    bloc = BlocProvider.of<TodoListsBloc>(context);
-    bloc.add(GetChunkEvent(0,50));
-    swap = false;
-    loading = false;
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<TodoListsBloc,TodoListsStates>(builder: (context, state) {
-      if (state is TodoListsLoading) {
-        loading = true;
-        return LinearProgressIndicator();
-      }
-      if (state is ChunkLoadFailed) {
-        return Center(child: Text("Failed to load lists"));
-      }
-      if (state is ChunkLoaded) {
-        loading = false;
-        currentChunk = state.chunkOfLists;
-        return ReorderableList(
-          onReorder: (Key movingItem, Key movedTo) {
-            setState(() {
-              swapFrom = currentChunk.data.indexWhere((element) => Key("Reorderable TodoList Item: ${element.id}") == movingItem) + currentChunk.start;
-              var swapToNew = currentChunk.data.indexWhere((element) => Key("Reorderable TodoList Item: ${element.id}") == movedTo) + currentChunk.start;
-              if (swapToNew == swapTo) {
-                // The item is dragged back in the direction of it's original position
-                swapTo = swapTo > swapFrom ? swapTo - 1 : swapTo + 1;
-              } else {
-                swapTo = swapToNew;
-              }
-              swap = true;
-            });
-            return true;
-            },
-          onReorderDone: (_) {
-              bloc.add(ReorderTodoListsEvent(swapTo-25, swapTo+25, currentChunk.get(swapFrom), swapTo));
-              swap = false;
-            },
-          child: ListView.builder(
-            itemBuilder: (BuildContext context, int index) {
-              if (swap) {
-//                print("$swapFrom, $swapTo: $index");
-                if (index == swapTo) {
-                  index = swapFrom;
-                } else if (swapFrom > swapTo && swapFrom >= index && swapTo < index) {
-                  index = index -= 1;
-                } else if (swapFrom < swapTo && swapFrom <= index && swapTo > index) {
-                  index = index += 1;
-                }
-//                print(" => $index");
-              }
-//              print("Index: $index");
-              if (index >= currentChunk.end || index < currentChunk.start) {
-                if (!loading) {
-                  print("Loading, $index, ${currentChunk.totalLength}, ${currentChunk.start}, ${currentChunk.end}");
-                  BlocProvider.of<TodoListsBloc>(context).add(GetChunkEvent(index-15, index+15));
-                  loading = true;
-                }
-                return Center(child: CircularProgressIndicator());
-              } else {
-                return TodoListsListItem(index, currentChunk.get(index));
-              }
-            },
-            itemCount: state.chunkOfLists.totalLength,
-            itemExtent: widget.itemExtent,
-            controller: scrollController,
+    return Container(
+      child: CachedList<TodoList>(
+          cache: widget.state.lists,
+          itemBuilder: (context, index, item) => DismissibleItem(
+            key: Key(item.id.toString()),
+            child: TodoListCard(item),
+            deleteMessage: "Delete todo list",
+            deletedMessage: "Todo list deleted",
+            onDismissed: () => _bloc.add(TodoListDeletedEvent(item, index)),
+            confirmMessage: "Delete list '${item.listName}'?",
           ),
-        );
-      }
-      throw "BUG: Failed to handle todolists state!";
-    });
-  }
-
-  void scroller() {
-    var position = scrollController.position;
-    var firstVisibleItem = (position.pixels / widget.itemExtent).floor();
-    var lastVisibleItem = currentChunk.totalLength - 1 - ((position.maxScrollExtent-position.pixels) / widget.itemExtent).floor();
-    var bufferedAbove = firstVisibleItem-currentChunk.start;
-    var bufferedBelow = currentChunk.end-1-lastVisibleItem;
-    if (!loading && bufferedAbove < 10 && currentChunk.start != 0) {
-      bloc.add(GetChunkEvent(firstVisibleItem-15, lastVisibleItem+15));
-      loading = true;
-    }
-    if (!loading && bufferedBelow < 10 && currentChunk.end != currentChunk.totalLength) {
-      bloc.add(GetChunkEvent(firstVisibleItem-15, lastVisibleItem+15));
-      loading = true;
-    }
-//    print("Scroll callback: $loading, ${firstVisibleItem+1}, ${lastVisibleItem+1}, ${bufferedAbove}, ${bufferedBelow}");
-  }
-}
-
-class TodoListsListItem extends StatelessWidget {
-  final int index;
-  final TodoList list;
-  TodoListsListItem(this.index, this.list);
-  
-  @override
-  Widget build(BuildContext context) {
-    return ReorderableItem(
-      key: Key("Reorderable TodoList Item: ${list.id}"),
-      childBuilder: (context, reorderState) {
-        if (reorderState == ReorderableItemState.placeholder) {
-          return Container();
-        }
-        return DelayedReorderableListener(
-          child: Dismissible(
-            key: Key(list.id.toString()),
-            child: ListTile(title: Text(list.listName), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => showTodoListScreen(context, list))),),
-            onDismissed: (_) {
-              BlocProvider.of<TodoListsBloc>(context).add(TodoListDeletedEvent(index-25, index+25, list));
-              Scaffold.of(context).showSnackBar(SnackBar(content: Text("Deleted list '${list.listName}'")));
-            },
-            background: Container( color: Colors.red, child: ListTile(leading: Icon(Icons.delete, color: Colors.white),title: Text("Delete list", style: TextStyle(color: Colors.white),)),),
-            confirmDismiss: (_) => showDialog(context: context, builder: (context) => ConfirmDeleteDialog(title: "Delete list '${list.listName}'?", subtitle: "This action cannot be undone!")),
-          )
-        );
-      },
+          reorderCallback: (from, to) => _bloc.add(TodoListsReorderedEvent(from, to)),
+          itemHeight: 70
+      ),
+      color: Colors.blue.shade100,
+      padding: EdgeInsets.symmetric(horizontal: 8),
     );
   }
 }
 
-class ConfirmDeleteDialog extends StatelessWidget {
-  final String title;
-  final String subtitle;
-
-  ConfirmDeleteDialog({@required this.title, this.subtitle});
+class TodoListCard extends StatelessWidget {
+  final TodoList list;
+  TodoListCard(this.list);
 
   @override
   Widget build(BuildContext context) {
-    var subtitleWidget;
-    if (subtitle != null) {
-      subtitleWidget = Text(subtitle);
-    }
-    return AlertDialog(
-      title: Text(title),
-      content: subtitleWidget,
-      actions: <Widget>[
-        FlatButton(child: Text("Cancel"), onPressed: () => Navigator.pop(context, false),),
-        RaisedButton( child: Text("Delete"), onPressed: () => Navigator.pop(context, true),),
-      ],
+    return Card(
+        child: Container(
+          height: 70,
+          child: Center(child: ListTile(
+              title: Text(list.listName, style: TextStyle(fontSize: 16),),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => showTodoListScreen(context, list))),
+          ))
+        )
     );
   }
 }
@@ -220,7 +113,7 @@ class _TodoListAdderState extends State<TodoListAdder> {
     var title = titleController.text.trim();
     print(title);
     // TODO Figure out what to do with the chunk size
-    var action = () {widget.bloc.add(TodoListAddedEvent(0, 10, TodoList(title), fromBottom: true)); Navigator.pop(context, true);};
+    var action = () {widget.bloc.add(TodoListAddedEvent(TodoList(title))); Navigator.pop(context, true);};
     return Column(
       children: <Widget>[
         ListTile(title: TextField(controller: titleController, autofocus: true, decoration: InputDecoration(labelText: "List title"),)),

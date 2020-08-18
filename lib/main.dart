@@ -39,7 +39,11 @@ class PointlessHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider<TodoListsBloc>(
-      create: (context) => TodoListsBloc(TodoRepositorySqflite.getInstance()),
+      create: (context) {
+        var bloc = TodoListsBloc(TodoRepositorySqflite.getInstance());
+        bloc.add(LoadTodoListsEvent());
+        return bloc;
+      },
       child: TodoListsScreen(),
     );
   }

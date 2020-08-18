@@ -171,7 +171,7 @@ class _TodoItemDetailsAddListDialogState
       content: BlocProvider<TodoListsBloc>(
         create: (context) {
           var bloc = TodoListsBloc(TodoRepositorySqflite.getInstance());
-          bloc.add(GetChunkEvent(0, 50));
+          bloc.add(LoadTodoListsEvent());
           return bloc;
         },
         child: Column(
@@ -225,7 +225,8 @@ class ListSelector extends StatelessWidget {
         if (state is TodoListsLoading) {
           return CircularProgressIndicator();
         }
-        var lists = (state as ChunkLoaded).chunkOfLists.data;
+        var cache = (state as TodoListsLoaded).lists;
+        var lists = [for (int i=0; i<50; i++) cache[i]];
         return DropdownButton(
           value: initial,
           items: lists.map((list) => DropdownMenuItem(value: list, child: Text(list.listName),)).toList(),
