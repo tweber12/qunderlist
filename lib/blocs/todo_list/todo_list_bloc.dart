@@ -148,7 +148,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       return _repository.getTodoItemsOfListChunk(_list.id, start, end, filter: filter);
     }
     cache = ListCache(underlyingData, totalLength);
-    cache.init(0);
+    await cache.init(0);
     yield TodoListLoaded(_list, cache);
   }
 }
