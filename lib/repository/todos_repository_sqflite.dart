@@ -552,6 +552,9 @@ Future<void> createDatabase(Database db, int version) async {
         $TODO_REMINDER_TIME text
       );
      """);
+    txn.execute("""
+      create index reminder_index on $TODO_REMINDERS_TABLE ($TODO_REMINDER_ITEM, $TODO_REMINDER_TIME, $ID);
+      """);
   });
 }
 
@@ -561,6 +564,20 @@ Future<List<DateTime>> _getReminders(Database db, int itemId) async {
       where: "$TODO_REMINDER_ITEM = ?",
       whereArgs: [itemId]);
   return results.map((m) => DateTime.parse(m[TODO_REMINDER_TIME])).toList();
+}
+class Reminder {
+  final int id;
+  final DateTime time;
+  final int itemId;
+  Reminder(this.id, this.time, this.itemId);
+}
+Future<List<Reminder>> _getRawReminders(Database db, List<Map<String,dynamic>> itemRepr) async {
+  List<int> itemIds = itemRepr.map((m) => (m[ID] as int)).toList();
+  var results = await db.query(TODO_REMINDERS_TABLE,
+      columns: [ID, TODO_REMINDER_TIME, TODO_REMINDER_ITEM],
+      where: "$TODO_REMINDER_ITEM in (${itemIds.join(",")})",
+      orderBy: TODO_REMINDER_ITEM);
+  return results.map((m) => Reminder(m[ID], DateTime.parse(m[TODO_REMINDER_TIME]), m[TODO_REMINDER_ITEM])).toList();
 }
 
 class _ItemsQuery {
@@ -609,10 +626,10 @@ class _ItemsQuery {
     ].join(", ");
     var results = await query(db, resultColumns);
     List<TodoItem> items = [];
+    var allReminders = (await _getRawReminders(db, results));
     for (final result in results) {
       var id = result[ID];
-      var reminders = await _getReminders(db, id);
-//      List<DateTime> reminders = [];
+      var reminders = allReminders.skipWhile((value) => value.itemId != id).takeWhile((value) => value.itemId==id).map((r) => r.time).toList();
       items.add(_todoItemFromRepresentation(result, reminders));
     }
     return items;
