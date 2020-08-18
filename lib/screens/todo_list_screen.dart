@@ -9,70 +9,136 @@ import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
 
 Widget showTodoListScreen(BuildContext context, TodoList initialList) {
+  TodoStatusFilter initialFilter = TodoStatusFilter.active;
   return BlocProvider<TodoListBloc>(
     create: (context) {
       var bloc = TodoListBloc(TodoRepositorySqflite.getInstance(), initialList);
-      bloc.add(GetDataEvent(filter: TodoStatusFilter.active));
+      bloc.add(GetDataEvent(filter: initialFilter));
       return bloc;
     },
-    child: TodoListScreen(),
+    child: TodoListScreen(initialFilter),
   );
 }
 
-class TodoListScreen extends StatelessWidget {
+class TodoListScreen extends StatefulWidget {
+  final TodoStatusFilter filter;
+  TodoListScreen(this.filter);
+
+  @override
+  _TodoListScreenState createState() => _TodoListScreenState();
+}
+
+class _TodoListScreenState extends State<TodoListScreen> {
+  TodoListBloc bloc;
+  TodoStatusFilter filter;
+
+  @override
+  void initState() {
+    bloc = BlocProvider.of<TodoListBloc>(context);
+    filter = widget.filter;
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
+    var bottomNavigationBar = BottomNavigationBar(
+      items: [
+        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.active)), title: Text("Active")),
+        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.completed)), title: Text("Completed")),
+        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.important)), title: Text("Important")),
+        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.withDueDate)), title: Text("Due")),
+      ],
+      currentIndex: _filterToBottomBarIndex(filter),
+      type: BottomNavigationBarType.fixed,
+      onTap: (index) {
+        _setFilter(_bottomBarIndexToFilter(index));
+      },
+    );
     return BlocBuilder<TodoListBloc,TodoListStates>(
       builder: (context, state) {
+        AppBar appBar;
+        Widget body;
+        FloatingActionButton floatingActionButton;
         if (state is TodoListLoading) {
-          return Scaffold(
-            appBar: AppBar(title: Text(state.list.listName),),
-            body: LinearProgressIndicator(),
-          );
-        }
-        if (state is TodoListLoadingFailed) {
-          return Scaffold(
-            appBar: AppBar(title: Text("Qunderlist")),
-            body: Center(child: Text("Failed to load list!")),
-          );
-        }
-        if (state is TodoListDeleted) {
+            appBar = AppBar(title: Text(state.list.listName),);
+            body = LinearProgressIndicator();
+        } else if (state is TodoListLoadingFailed) {
+            appBar = AppBar(title: Text("Qunderlist"));
+            body = Center(child: Text("Failed to load list!"));
+        } else if (state is TodoListDeleted) {
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
           } else {
-            return Scaffold(
-              appBar: AppBar(title: Text("Qunderlist")),
-              body: Center(child: Text("Error: The list was deleted!")),
-            );
+              appBar = AppBar(title: Text("Qunderlist"));
+              body = Center(child: Text("Error: The list was deleted!"));
           }
+        } else if (state is TodoListLoaded) {
+            appBar = AppBar(title: Text(state.list.listName));
+            floatingActionButton = FloatingActionButton(child: Icon(Icons.add), onPressed: () {showModalBottomSheet(context: context, builder: (context) => TodoItemAdder(bloc));});
+            if (state.items.totalNumberOfItems != 0) {
+              body = TodoListItemList(state.items);
+            } else {
+              body = Center(child: Column(children: <Widget>[
+                Icon(_iconForFilter(filter), size: 96),
+                Text("There's nothing here", style: TextStyle(fontSize: 24),),
+              ],
+                mainAxisAlignment: MainAxisAlignment.center,
+              ),
+              );
+            }
+        } else {
+          throw "BUG: Unhandled state in todo lists screen";
         }
-        if (state is TodoListLoaded) {
-          print("Redraw: n_items = ${state.items.totalNumberOfItems}");
-          return Scaffold(
-            appBar: AppBar(title: Text(state.list.listName), actions: <Widget>[FilterButton(), IconButton(icon: Icon(Icons.more_vert))],),
-            body: TodoListItemList(state.items),
-            floatingActionButton: FloatingActionButton(child: Icon(Icons.add), onPressed: () {var bloc = BlocProvider.of<TodoListBloc>(context); showModalBottomSheet(context: context, builder: (context) => TodoItemAdder(bloc));}),
-          );
-        }
-        throw "BUG: Unhandled state in todo lists screen";
+        return Scaffold(
+          appBar: appBar,
+          body: body,
+          floatingActionButton: floatingActionButton,
+          bottomNavigationBar: bottomNavigationBar,
+        );
       },
     );
   }
-}
 
-class FilterButton extends StatelessWidget {
+  void _setFilter(TodoStatusFilter newFilter) {
+    setState(() {
+      filter = newFilter;
+      bloc.add(UpdateFilterEvent(newFilter));
+    });
+  }
+
+  static IconData _iconForFilter(TodoStatusFilter filter) {
+    switch (filter) {
+      case TodoStatusFilter.active: return Icons.radio_button_unchecked;
+      case TodoStatusFilter.completed: return Icons.check_circle_outline;
+      case TodoStatusFilter.important: return Icons.bookmark_border;
+      case TodoStatusFilter.withDueDate: return Icons.date_range;
+      default: throw "BUG: Unsupported filter in List BottomBar";
+    }
+  }
+
+  static int _filterToBottomBarIndex(TodoStatusFilter filter) {
+    switch (filter) {
+      case TodoStatusFilter.active: return 0;
+      case TodoStatusFilter.completed: return 1;
+      case TodoStatusFilter.important: return 2;
+      case TodoStatusFilter.withDueDate: return 3;
+      default: throw "BUG: Unsupported filter in List BottomBar";
+    }
+  }
+  static TodoStatusFilter _bottomBarIndexToFilter(int index) {
+    switch (index) {
+      case 0: return TodoStatusFilter.active;
+      case 1: return TodoStatusFilter.completed;
+      case 2: return TodoStatusFilter.important;
+      case 3: return TodoStatusFilter.withDueDate;
+      default: throw "BUG: Unsupported index for List BottomBar";
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<TodoStatusFilter>(
-      child: Icon(Icons.filter_list),
-      itemBuilder: (_) => [
-        const PopupMenuItem(value: TodoStatusFilter.active ,child: ListTile(leading: Icon(Icons.check_box_outline_blank), title: Text("active"))),
-        const PopupMenuItem(value: TodoStatusFilter.completed ,child: ListTile(leading: Icon(Icons.check_box), title: Text("completed"))),
-        const PopupMenuItem(value: TodoStatusFilter.important ,child: ListTile(leading: Icon(Icons.bookmark_border), title: Text("important"))),
-        const PopupMenuItem(value: TodoStatusFilter.withDueDate ,child: ListTile(leading: Icon(Icons.calendar_today), title: Text("with date"))),
-      ],
-      onSelected: (filter) => BlocProvider.of<TodoListBloc>(context).add(GetDataEvent(filter: filter)),
-    );
+  void dispose() {
+    bloc.close();
+    super.dispose();
   }
 }
 
