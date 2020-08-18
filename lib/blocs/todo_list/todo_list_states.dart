@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/repository/repository.dart';
 
 abstract class TodoListStates with EquatableMixin {
@@ -21,7 +22,7 @@ class TodoListLoadingFailed extends TodoListStates {
 
 class TodoListLoaded extends TodoListStates {
   final TodoList list;
-  final Chunk<TodoItem> items;
+  final ListCache<TodoItem> items;
 
   TodoListLoaded(this.list, this.items);
 

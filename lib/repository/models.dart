@@ -21,18 +21,26 @@ class TodoItem {
   TodoItem(this.todo, this.createdOn, {this.id, this.completed = false, this.completedOn, this.priority = TodoPriority.none, this.note, this.dueDate, reminders}):
       this.reminders = reminders ?? [];
 
-  TodoItem copyWith({String todo, bool completed, TodoPriority priority, String note, DateTime dueDate, DateTime createdOn, DateTime completedOn, List<DateTime> reminders, bool deleteDueDate=false}) {
+  TodoItem copyWith({int id, String todo, bool completed, TodoPriority priority, String note, DateTime dueDate, DateTime createdOn, DateTime completedOn, List<DateTime> reminders, bool deleteDueDate=false, bool setCompletedOn=false}) {
     return TodoItem(
       todo ?? this.todo,
       createdOn ?? this.createdOn,
-      id: this.id,
+      id: id ?? this.id,
       completed: completed ?? this.completed,
       priority: priority ?? this.priority,
       note: note ?? this.note,
       dueDate: dueDate!=null || deleteDueDate ? dueDate : this.dueDate,
-      completedOn: completedOn ?? this.completedOn,
+      completedOn: completedOn!=null || setCompletedOn ? completedOn : this.completedOn,
       reminders: reminders ?? this.reminders,
     );
+  }
+
+  TodoItem toggleCompleted() {
+    if (completed) {
+      return this.copyWith(completed: false, completedOn: null, setCompletedOn: true);
+    } else {
+      return this.copyWith(completed: true, completedOn: DateTime.now());
+    }
   }
 }
 

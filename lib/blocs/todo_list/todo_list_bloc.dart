@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:bloc/bloc.dart';
+import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_events.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_states.dart';
 import 'package:qunderlist/repository/repository.dart';
@@ -10,11 +11,11 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   TodoList _list;
   TodoListBloc(R repository, TodoList list): _repository=repository, _list=list, super(TodoListLoading(list));
 
-  int start;
-  int end;
-  Chunk<TodoItem> lastChunk;
+  ListCache<TodoItem> cache;
   TodoStatusFilter filter;
   TodoListOrdering ordering;
+
+  int get listId => _list.id;
 
   @override
   Stream<TodoListStates> mapEventToState(TodoListEvent event) async* {
@@ -24,8 +25,8 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       yield* _mapDeleteListEventToState(event);
     } else if (event is GetDataEvent) {
       yield* _mapGetDataEventToState(event);
-    } else if (event is ReloadDataEvent) {
-      yield* _mapReloadDataEventToState(event);
+    } else if (event is NotifyItemUpdateEvent) {
+      yield* _mapNotifyItemUpdateEventToState(event);
     } else if (event is AddItemEvent) {
       yield* _mapAddItemEventToState(event);
     } else if (event is DeleteItemEvent) {
@@ -45,91 +46,110 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
 
   Stream<TodoListStates> _mapRenameListEventToState(RenameListEvent event) async* {
     await _repository.updateTodoList(TodoList(event.name, id: _list.id));
-    yield TodoListLoaded(_list, lastChunk);
+    yield TodoListLoaded(_list, cache);
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {
     await _repository.deleteTodoList(_list);
     yield TodoListDeleted();
   }
   Stream<TodoListStates> _mapGetDataEventToState(GetDataEvent event) async* {
-    if (lastChunk != null) {
-      ChunkRange range = event.fromBottom ? ChunkRange.fromBottom(event.start, event.end, lastChunk.totalLength) : ChunkRange(event.start, event.end);
-      var oldRange = ChunkRange(lastChunk.start, lastChunk.end);
-      if (event.filter == filter && event.ordering == ordering && oldRange.contains(range)) {
-        yield TodoListLoaded(_list, lastChunk);
-        return;
-      }
-      range = range.union(oldRange);
-    }
-    // TODO Only load new pieces, if possible
-    var totalLength = await _repository.getNumberOfItems(_list.id, filter: event.filter);
-    ChunkRange range = event.fromBottom ? ChunkRange.fromBottom(event.start, event.end, totalLength) : ChunkRange(event.start, event.end);
-    var list = await _repository.getTodoItemsOfListChunk(_list.id, range._start, range._end, filter: event.filter);
-    var chunk = Chunk(range._start, list, totalLength);
-    start = range._start;
-    end = range._end;
-    lastChunk = chunk;
-    filter = event.filter;
-    ordering = event.ordering;
-    yield TodoListLoaded(_list, chunk);
+    yield* _updateCache(event.filter, event.ordering);
   }
-  Stream<TodoListStates> _mapReloadDataEventToState(ReloadDataEvent event) async* {
-    yield* _reloadChunk();
+  Stream<TodoListStates> _mapNotifyItemUpdateEventToState(NotifyItemUpdateEvent event) async* {
+    if (event.index < cache.chainStart || event.index > cache.chainEnd) {
+      // There is a corner case where the element was at the last position and removed
+      // In that case the element index is not contained in the cached range anymore
+      // That is what the slightly extended range is for
+      return;
+    }
+    bool shouldNotBeContained = !event.lists.contains(_list)
+      || (filter==TodoStatusFilter.active && event.item.completed)
+      || (filter==TodoStatusFilter.completed && !event.item.completed)
+      || (filter==TodoStatusFilter.important && event.item.priority!=TodoPriority.high)
+      || (filter==TodoStatusFilter.withDueDate && event.item.dueDate==null);
+    if (event.index == cache.chainEnd) {
+      // Handle the corner case of the event being exactly at the end of the chain
+      if (!shouldNotBeContained) {
+        // If the event should be there and fits exactly at the end of the chain, then add it
+        cache = cache.addElement(event.index, event.item);
+        yield TodoListLoaded(_list, cache);
+      }
+      // In any case return, so that all events in the remainder of the code fit in the cached range
+      return;
+    }
+    print("NOTIFY ITEM UPDATE: ${cache[event.index].id == event.item.id}, $shouldNotBeContained");
+    if (cache[event.index].id == event.item.id && shouldNotBeContained) {
+      print("REMOVING ELEMENT");
+      cache = cache.removeElement(event.index);
+    } else if (cache[event.index].id != event.item.id && !shouldNotBeContained) {
+      print("ADDING IT AGAIN");
+      cache = cache.addElement(event.index, event.item);
+    } else {
+      cache = cache.updateElement(event.index, event.item);
+    }
+    yield TodoListLoaded(_list, cache);
   }
   Stream<TodoListStates> _mapAddItemEventToState(AddItemEvent event) async* {
-    await _repository.addTodoItem(event.item, _list.id);
-    yield* _reloadChunk();
+    var id = await _repository.addTodoItem(event.item, _list.id);
+    cache = cache.addElement(cache.totalNumberOfItems, event.item.copyWith(id: id));
+    yield TodoListLoaded(_list, cache);
   }
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
+    cache = cache.removeElement(event.index);
+    yield TodoListLoaded(_list, cache);
     await _repository.removeTodoItemFromList(event.item, _list.id);
-    yield* _reloadChunk();
   }
   Stream<TodoListStates> _mapCompleteItemEventToState(CompleteItemEvent event) async* {
-    await _repository.completeTodoItem(event.item);
-    yield* _reloadChunk();
+    var newItem = event.item.toggleCompleted();
+    if (filter == TodoStatusFilter.active || filter == TodoStatusFilter.completed) {
+      // In these two cases, the item won't be included in the list anymore
+      cache = cache.removeElement(event.index);
+    } else {
+      cache = cache.updateElement(event.index, newItem);
+    }
+    yield TodoListLoaded(_list, cache);
+    await _repository.updateTodoItem(newItem);
   }
   Stream<TodoListStates> _mapUpdateItemPriorityEventToState(UpdateItemPriorityEvent event) async* {
     var newItem = event.item.copyWith(priority: event.priority);
-    await _repository.updateTodoItem(newItem);
-    if (filter != TodoStatusFilter.important && _lastChunkHasItem(newItem, event.index)) {
-      var list = lastChunk.data.map((e) => e.id==newItem.id ? newItem : e).toList();
-      lastChunk = Chunk(lastChunk.start, list, lastChunk.totalLength);
-      yield TodoListLoaded(_list, lastChunk);
+    if (filter == TodoStatusFilter.important) {
+      // The item now fails the filter, so it has to be removed from the cache
+      cache = cache.removeElement(event.index);
     } else {
-      yield* _reloadChunk();
+      // In all other cases, the element is still being shown, so update it accordingly
+      cache = cache.updateElement(event.index, newItem);
     }
+    yield TodoListLoaded(_list, cache);
+    await _repository.updateTodoItem(newItem);
   }
   Stream<TodoListStates> _mapReorderItemsEventToState(ReorderItemsEvent event) async* {
-    await _repository.moveItemInList(event.item, _list.id, event.moveTo);
-    yield* _reloadChunk();
+    var item = await cache.peekItem(event.moveFrom);
+    var oldCache = cache;
+    var newCache = cache.removeElement(event.moveFrom);
+//    int moveTo = event.moveTo > event.moveFrom ? event.moveTo-1 : event.moveTo;
+    newCache = newCache.addElement(event.moveTo, item);
+    cache = newCache;
+    yield TodoListLoaded(_list, cache);
+    var moveToItem = await oldCache.peekItem(event.moveTo);
+    await _repository.moveItemInList(item, _list.id, moveToItem.id);
   }
   Stream<TodoListStates> _mapUpdateFilterEventToState(UpdateFilterEvent event) async* {
-    filter = event.filter;
-    yield* _reloadChunk();
+    yield* _updateCache(event.filter, ordering);
   }
-
-  Stream<TodoListStates> _reloadChunk() async* {
+  Stream<TodoListStates> _updateCache(TodoStatusFilter filter, TodoListOrdering ordering) async* {
+    if (cache != null && filter == this.filter && ordering == this.ordering) {
+      yield TodoListLoaded(_list, cache);
+      return;
+    }
+    this.filter = filter;
+    this.ordering = ordering;
     var totalLength = await _repository.getNumberOfItems(_list.id, filter: filter);
-    var list = await _repository.getTodoItemsOfListChunk(_list.id, start, end, filter: filter);
-    var chunk = Chunk(lastChunk.start, list, totalLength);
-    lastChunk = chunk;
-    yield TodoListLoaded(_list, lastChunk);
-  }
-
-  bool _lastChunkHasItem(TodoItem item, int index) {
-    if (lastChunk == null) {
-      return false;
+    Future<List<TodoItem>> underlyingData(int start, int end) {
+      return _repository.getTodoItemsOfListChunk(_list.id, start, end, filter: filter);
     }
-    if (index == null) {
-      for (final i in lastChunk.data) {
-        if (i.id == item.id) {
-          return true;
-        }
-      }
-      return false;
-    } else {
-      return lastChunk.contains(index);
-    }
+    cache = ListCache(underlyingData, totalLength);
+    cache.init(0);
+    yield TodoListLoaded(_list, cache);
   }
 }
 

@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/repository/models.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
+import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
 
 Widget showTodoListScreen(BuildContext context, TodoList initialList) {
   return BlocProvider<TodoListBloc>(
     create: (context) {
       var bloc = TodoListBloc(TodoRepositorySqflite.getInstance(), initialList);
-      bloc.add(GetDataEvent(0, 50, filter: TodoStatusFilter.active));
+      bloc.add(GetDataEvent(filter: TodoStatusFilter.active));
       return bloc;
     },
     child: TodoListScreen(),
@@ -45,7 +47,7 @@ class TodoListScreen extends StatelessWidget {
           }
         }
         if (state is TodoListLoaded) {
-          print("Redraw: n_items = ${state.items.totalLength}");
+          print("Redraw: n_items = ${state.items.totalNumberOfItems}");
           return Scaffold(
             appBar: AppBar(title: Text(state.list.listName), actions: <Widget>[FilterButton(), IconButton(icon: Icon(Icons.more_vert))],),
             body: TodoListItemList(state.items),
@@ -69,24 +71,35 @@ class FilterButton extends StatelessWidget {
         const PopupMenuItem(value: TodoStatusFilter.important ,child: ListTile(leading: Icon(Icons.bookmark_border), title: Text("important"))),
         const PopupMenuItem(value: TodoStatusFilter.withDueDate ,child: ListTile(leading: Icon(Icons.calendar_today), title: Text("with date"))),
       ],
-      onSelected: (filter) => BlocProvider.of<TodoListBloc>(context).add(GetDataEvent(0, 50, filter: filter)),
+      onSelected: (filter) => BlocProvider.of<TodoListBloc>(context).add(GetDataEvent(filter: filter)),
     );
   }
 }
 
 class TodoListItemList extends StatelessWidget {
-  final Chunk<TodoItem> items;
+  final ListCache<TodoItem> items;
   TodoListItemList(this.items);
 
   @override
   Widget build(BuildContext context) {
-    print("${items.totalLength}");
+    var bloc = BlocProvider.of<TodoListBloc>(context);
+    print("${items.totalNumberOfItems}");
     return Container(
-      child: ListView.builder(
-        itemBuilder: (context, index) => TodoListItemCard(index, items.get(index)),
-        itemCount: items.totalLength,
+      child: CachedList(
+          cache: items,
+          itemBuilder: (context, index, item) => DismissibleItem(
+              key: Key(item.id.toString()),
+              child: TodoListItemCard(index, item),
+              deleteMessage: "Delete todo item",
+              deletedMessage: "Todo item deleted",
+              onDismissed: () => bloc.add(DeleteItemEvent(item, index: index)),
+              undoAction: () => bloc.add(AddItemEvent(item)),
+          ),
+          reorderCallback: (from, to) => bloc.add(ReorderItemsEvent(from, to)),
+          itemHeight: 50
       ),
       color: Colors.blue.shade100,
+      padding: EdgeInsets.symmetric(horizontal: 8),
     );
   }
 }
@@ -123,7 +136,7 @@ class TodoListItemCard extends StatelessWidget {
         child: Row(
           children: <Widget>[
             IconButton(
-              icon: item.completed ? Icon(Icons.check_box) : Icon(Icons.check_box_outline_blank),
+              icon: Icon(item.completed ? Icons.check_box : Icons.check_box_outline_blank, color: Colors.black54), //item.completed ? Icon(Icons.check_box) : Icon(Icons.check_box_outline_blank),
               onPressed: () => BlocProvider.of<TodoListBloc>(context).add(CompleteItemEvent(item, index: index)),
             ),
             Expanded(
@@ -131,7 +144,7 @@ class TodoListItemCard extends StatelessWidget {
                   child: center,
                   onTap: () async {
                     var bloc = BlocProvider.of<TodoListBloc>(context);
-                    TodoItem updatedItem = await Navigator.push(context, MaterialPageRoute(builder: (context) => showTodoItemScreen(context, item, todoListBloc: bloc)));
+                    TodoItem updatedItem = await Navigator.push(context, MaterialPageRoute(builder: (context) => showTodoItemScreen(context, item, index: index, todoListBloc: bloc)));
                   },
                 )
             ),
@@ -141,7 +154,7 @@ class TodoListItemCard extends StatelessWidget {
                 shape: CircleBorder(),
               ),
               child: IconButton(
-                icon: Icon(Icons.bookmark_border),
+                icon: Icon(Icons.bookmark_border, color: Colors.black54,),
                 color: item.priority==TodoPriority.none ? null : Colors.white,
                 onPressed: () => BlocProvider.of<TodoListBloc>(context).add(UpdateItemPriorityEvent(item, item.priority==TodoPriority.none ? TodoPriority.high : TodoPriority.none, index: index)),
               ),
@@ -149,7 +162,7 @@ class TodoListItemCard extends StatelessWidget {
           ],
         ),
       ),
-      margin: EdgeInsets.symmetric(vertical: 1.5, horizontal: 6),
+      margin: EdgeInsets.symmetric(vertical: 0.5),
     );
   }
 }

@@ -7,7 +7,7 @@ import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 
 Widget showTodoItemScreen(BuildContext context, TodoItem initialItem,
-    {TodoListBloc todoListBloc}) {
+    {TodoListBloc todoListBloc, int index}) {
   return WillPopScope(
       onWillPop: () {
         print("ON WILL POP");
@@ -17,7 +17,7 @@ Widget showTodoItemScreen(BuildContext context, TodoItem initialItem,
       child: BlocProvider<TodoDetailsBloc>(
         create: (context) {
           var bloc =
-              TodoDetailsBloc(TodoRepositorySqflite.getInstance(), initialItem);
+              TodoDetailsBloc(TodoRepositorySqflite.getInstance(), initialItem, index, todoListBloc);
           bloc.add(LoadItemEvent());
           return bloc;
         },

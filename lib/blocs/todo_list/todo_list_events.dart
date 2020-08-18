@@ -20,21 +20,23 @@ class DeleteListEvent extends TodoListEvent {
 }
 
 class GetDataEvent extends TodoListEvent {
-  final int start;
-  final int end;
-  final bool fromBottom;
   final TodoStatusFilter filter;
   final TodoListOrdering ordering;
 
-  GetDataEvent(this.start, this.end, {this.fromBottom=false, this.filter=TodoStatusFilter.active, this.ordering=TodoListOrdering.custom});
+  GetDataEvent({this.filter=TodoStatusFilter.active, this.ordering=TodoListOrdering.custom});
 
   @override
-  List<Object> get props => [start, end, fromBottom, filter, ordering];
+  List<Object> get props => [filter, ordering];
 }
 
-class ReloadDataEvent extends TodoListEvent {
+class NotifyItemUpdateEvent extends TodoListEvent {
+  final int index;
+  final TodoItem item;
+  final List<TodoList> lists;
+  NotifyItemUpdateEvent(this.index, this.item, this.lists);
+
   @override
-  List<Object> get props => [];
+  List<Object> get props => [index, item];
 }
 
 class UpdateFilterEvent extends TodoListEvent {
@@ -86,11 +88,11 @@ class UpdateItemPriorityEvent extends TodoListEvent {
 }
 
 class ReorderItemsEvent extends TodoListEvent {
-  final TodoItem item;
+  final int moveFrom;
   final int moveTo;
 
-  ReorderItemsEvent(this.item, this.moveTo);
+  ReorderItemsEvent(this.moveFrom, this.moveTo);
 
   @override
-  List<Object> get props => [item, moveTo];
+  List<Object> get props => [moveFrom, moveTo];
 }

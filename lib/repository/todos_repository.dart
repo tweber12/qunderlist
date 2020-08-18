@@ -1,7 +1,7 @@
 import 'package:qunderlist/repository/models.dart';
 
 abstract class TodoRepository {
-  Future<void> addTodoItem(TodoItem item, int listId);
+  Future<int> addTodoItem(TodoItem item, int listId);
   Future<void> completeTodoItem(TodoItem item);
   Future<void> updateTodoItem(TodoItem item);
   Future<void> deleteTodoItem(TodoItem item);
@@ -23,7 +23,7 @@ abstract class TodoRepository {
   Future<void> addTodoItemToList(TodoItem item, int listId);
   Future<void> removeTodoItemFromList(TodoItem item, int listId);
   Future<void> moveTodoItemToList(TodoItem item, int oldListId, int newListId);
-  Future<void> moveItemInList(TodoItem item, int listId, int moveTo);
+  Future<void> moveItemInList(TodoItem item, int listId, int moveToId);
   Future<void> moveItemToTopOfList(TodoItem item, int listId, {int offset});
   Future<void> moveItemToBottomOfList(TodoItem item, int listId, {int offset});
 }

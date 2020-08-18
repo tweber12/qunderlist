@@ -52,14 +52,15 @@ class TodoRepositorySqflite implements TodoRepository {
   TodoRepositorySqflite._internal();
 
   @override
-  Future<void> addTodoItem(TodoItem item, int listId) async {
+  Future<int> addTodoItem(TodoItem item, int listId) async {
     var db = await _db;
+    var id;
     await db.transaction((txn) async {
-      var id =
-          await txn.insert(TODO_ITEMS_TABLE, _todoItemToRepresentation(item));
+      id = await txn.insert(TODO_ITEMS_TABLE, _todoItemToRepresentation(item));
       await _addReminders(id, item.reminders, txn: txn);
       await _addTodoItemToList(listId, id, txn: txn);
     });
+    return id;
   }
 
   @override
@@ -85,7 +86,7 @@ class TodoRepositorySqflite implements TodoRepository {
   Future<void> deleteTodoItem(TodoItem item) async {
     var db = await _db;
     await db.transaction((txn) async {
-      _deleteTodoItem(item.id, txn);
+      await _deleteTodoItem(item.id, txn);
     });
   }
 
@@ -263,7 +264,7 @@ class TodoRepositorySqflite implements TodoRepository {
 
   @override
   Future<void> addTodoItemToList(TodoItem item, int listId) async {
-    _addTodoItemToList(listId, item.id);
+    return _addTodoItemToList(listId, item.id);
   }
 
   @override
@@ -285,26 +286,36 @@ class TodoRepositorySqflite implements TodoRepository {
   }
 
   @override
-  Future<void> moveItemInList(TodoItem item, int listId, int moveTo) async {
+  Future<void> moveItemInList(TodoItem item, int listId, int moveToId) async {
+    print("REORDER: ${item.id}, $moveToId");
     var db = await _db;
     await db.transaction((txn) async {
       var ordering = await txn.query(TODO_LIST_ITEMS_TABLE,
           columns: [TODO_LIST_ITEMS_ORDERING],
-          where: "$TODO_LIST_ITEMS_ITEM = ?",
-          whereArgs: [item.id]);
-      var position = ordering.first[TODO_LIST_ITEMS_ORDERING];
+          where: "$TODO_LIST_ITEMS_ITEM = ? or $TODO_LIST_ITEMS_ITEM = ?",
+          whereArgs: [item.id, moveToId]);
+      var position;
+      var moveTo;
+      if (ordering[0][ID] == item.id) {
+        position = ordering[0][TODO_LIST_ITEMS_ORDERING];
+        moveTo = ordering[1][TODO_LIST_ITEMS_ORDERING];
+      } else {
+        position = ordering[1][TODO_LIST_ITEMS_ORDERING];
+        moveTo = ordering[0][TODO_LIST_ITEMS_ORDERING];
+      }
+      print("REORDER: $position -> $moveTo");
       if (position > moveTo) {
         await txn.rawUpdate("""
             update $TODO_LIST_ITEMS_TABLE
                set $TODO_LIST_ITEMS_ORDERING = $TODO_LIST_ITEMS_ORDERING+1
-             where $TODO_LIST_ITEMS_ORDERING > ? and $TODO_LIST_ITEMS_ORDERING <= ?;
+             where $TODO_LIST_ITEMS_ORDERING < ? and $TODO_LIST_ITEMS_ORDERING >= ?;
           """, [position, moveTo]);
       } else if (position < moveTo) {
         await txn.rawUpdate("""
             update $TODO_LIST_ITEMS_TABLE
                set $TODO_LIST_ITEMS_ORDERING = $TODO_LIST_ITEMS_ORDERING-1
-             where $TODO_LIST_ITEMS_ORDERING >= ? and $TODO_LIST_ITEMS_ORDERING < ?;
-          """, [moveTo, position]);
+             where $TODO_LIST_ITEMS_ORDERING > ? and $TODO_LIST_ITEMS_ORDERING <= ?;
+          """, [position, moveTo]);
       }
       await txn.update(
           TODO_LIST_ITEMS_TABLE, {TODO_LIST_ITEMS_ORDERING: moveTo},
@@ -315,7 +326,7 @@ class TodoRepositorySqflite implements TodoRepository {
   @override
   Future<void> moveItemToTopOfList(TodoItem item, int listId, {int offset}) async {
     var moveTo = 1 + (offset ?? 0);
-    moveItemInList(item, listId, moveTo);
+    return moveItemInList(item, listId, moveTo);
   }
 
 
@@ -327,7 +338,7 @@ class TodoRepositorySqflite implements TodoRepository {
       _lastOrderingInList[listId] = lastOrderId;
     }
     var moveTo = lastOrderId - (offset ?? 0);
-    moveItemInList(item, listId, moveTo);
+    return moveItemInList(item, listId, moveTo);
   }
 
   Future<void> _removeTodoItemFromList(Transaction txn, int listId, int itemId,
@@ -350,7 +361,7 @@ class TodoRepositorySqflite implements TodoRepository {
              where $TODO_LIST_ITEMS_ITEM = ?;
           """, [itemId]);
       if (count == null || count.first[TODO_LIST_ITEMS_LIST] == 0) {
-        _deleteTodoItem(itemId, txn);
+        return _deleteTodoItem(itemId, txn);
       }
     }
   }
@@ -395,7 +406,7 @@ class TodoRepositorySqflite implements TodoRepository {
         TODO_REMINDER_TIME: reminder.toIso8601String()
       });
     }
-    batch.commit();
+    await batch.commit();
   }
 
   Future<void> _updateReminders(int itemId, List<DateTime> reminders,
@@ -404,19 +415,19 @@ class TodoRepositorySqflite implements TodoRepository {
       var db = await _db;
       await db.transaction((txn) => _updateRemindersTxn(txn, itemId, reminders));
     } else {
-      _updateRemindersTxn(txn, itemId, reminders);
+      await _updateRemindersTxn(txn, itemId, reminders);
     }
   }
 
   Future<void> _updateRemindersTxn(
       Transaction txn, int itemId, List<DateTime> reminders) async {
-    _deleteReminders(itemId, txn: txn);
-    _addReminders(itemId, reminders, txn: txn);
+    await _deleteReminders(itemId, txn: txn);
+    await _addReminders(itemId, reminders, txn: txn);
   }
 
   Future<void> _deleteReminders(int itemId, {Transaction txn}) async {
     var db = txn ?? await _db;
-    db.delete(TODO_REMINDERS_TABLE,
+    await db.delete(TODO_REMINDERS_TABLE,
         where: "$TODO_REMINDER_ITEM = ?", whereArgs: [itemId]);
   }
 
