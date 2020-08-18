@@ -682,12 +682,13 @@ class _ItemsQuery {
     }
   }
   static String buildAmount(int offset, int limit) {
+    print("READ: $offset, $limit");
     var amount = "";
-    if (offset != 0) {
-      amount += " offset $offset ";
-    }
     if (limit != null) {
       amount += " limit $limit";
+    }
+    if (offset != 0) {
+      amount += " offset $offset ";
     }
     return amount;
   }
