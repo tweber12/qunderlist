@@ -16,12 +16,12 @@ class TodoItem {
   final DateTime dueDate;
   final DateTime createdOn;
   final DateTime completedOn;
-  final List<DateTime> reminders;
+  final List<Reminder> reminders;
 
   TodoItem(this.todo, this.createdOn, {this.id, this.completed = false, this.completedOn, this.priority = TodoPriority.none, this.note, this.dueDate, reminders}):
       this.reminders = reminders ?? [];
 
-  TodoItem copyWith({int id, String todo, bool completed, TodoPriority priority, String note, DateTime dueDate, DateTime createdOn, DateTime completedOn, List<DateTime> reminders, bool deleteDueDate=false, bool setCompletedOn=false}) {
+  TodoItem copyWith({int id, String todo, bool completed, TodoPriority priority, String note, DateTime dueDate, DateTime createdOn, DateTime completedOn, List<Reminder> reminders, bool deleteDueDate=false, bool setCompletedOn=false}) {
     return TodoItem(
       todo ?? this.todo,
       createdOn ?? this.createdOn,
@@ -74,6 +74,26 @@ class TodoList with EquatableMixin {
   TodoList withId(int id) {
     assert(this.id == null);
     return TodoList(listName, id: id);
+  }
+}
+
+class Reminder with EquatableMixin {
+  final int id;
+  final DateTime at;
+
+  Reminder(this.at, {this.id});
+
+  @override
+  List<Object> get props => [id, at];
+
+  Reminder withId(int id) {
+    return Reminder(at, id: id);
+  }
+  Reminder copyWith({DateTime at}) {
+    return Reminder(
+      at ?? this.at,
+      id: this.id,
+    );
   }
 }
 

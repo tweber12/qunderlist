@@ -397,20 +397,17 @@ class TodoRepositorySqflite implements TodoRepository {
     _lastOrderingInList[listId] = lastOrderId + 1;
   }
 
-  Future<void> _addReminders(int itemId, List<DateTime> reminders,
+  Future<void> _addReminders(int itemId, List<Reminder> reminders,
       {Transaction txn}) async {
     var db = txn ?? await _db;
     var batch = db.batch();
     for (final reminder in reminders) {
-      batch.insert(TODO_REMINDERS_TABLE, {
-        TODO_REMINDER_ITEM: itemId,
-        TODO_REMINDER_TIME: reminder.toIso8601String()
-      });
+      batch.insert(TODO_REMINDERS_TABLE, _reminderToRepresentation(reminder));
     }
     await batch.commit();
   }
 
-  Future<void> _updateReminders(int itemId, List<DateTime> reminders,
+  Future<void> _updateReminders(int itemId, List<Reminder> reminders,
       {Transaction txn}) async {
     if (txn == null) {
       var db = await _db;
@@ -421,7 +418,7 @@ class TodoRepositorySqflite implements TodoRepository {
   }
 
   Future<void> _updateRemindersTxn(
-      Transaction txn, int itemId, List<DateTime> reminders) async {
+      Transaction txn, int itemId, List<Reminder> reminders) async {
     await _deleteReminders(itemId, txn: txn);
     await _addReminders(itemId, reminders, txn: txn);
   }
@@ -482,7 +479,7 @@ Map<String, dynamic> _todoItemToRepresentation(TodoItem item) {
 }
 
 TodoItem _todoItemFromRepresentation(
-    Map<String, dynamic> representation, List<DateTime> reminders) {
+    Map<String, dynamic> representation, List<Reminder> reminders) {
   return TodoItem(
     representation[TODO_ITEM_NAME],
     DateTime.parse(representation[TODO_ITEM_CREATED_DATE]),
@@ -558,26 +555,38 @@ Future<void> createDatabase(Database db, int version) async {
   });
 }
 
-Future<List<DateTime>> _getReminders(Database db, int itemId) async {
+Future<List<Reminder>> _getReminders(Database db, int itemId) async {
   var results = await db.query(TODO_REMINDERS_TABLE,
       columns: [TODO_REMINDER_TIME],
       where: "$TODO_REMINDER_ITEM = ?",
       whereArgs: [itemId]);
-  return results.map((m) => DateTime.parse(m[TODO_REMINDER_TIME])).toList();
+  return results.map(_reminderFromRepresentation).toList();
 }
-class Reminder {
-  final int id;
-  final DateTime time;
+
+Reminder _reminderFromRepresentation(Map<String,dynamic> representation) {
+  return Reminder(DateTime.parse(representation[TODO_REMINDER_TIME]), id: representation[ID]);
+}
+
+Map<String,dynamic> _reminderToRepresentation(Reminder reminder) {
+  return { ID: reminder.id, TODO_REMINDER_TIME: reminder.at.toIso8601String() };
+}
+
+class ReminderOf {
+  final Reminder reminder;
   final int itemId;
-  Reminder(this.id, this.time, this.itemId);
+  ReminderOf(this.reminder, this.itemId);
 }
-Future<List<Reminder>> _getRawReminders(Database db, List<Map<String,dynamic>> itemRepr) async {
+ReminderOf _reminderOfFromRepresentation(Map<String,dynamic> representation) {
+  return ReminderOf(_reminderFromRepresentation(representation), representation[TODO_REMINDER_ITEM]);
+}
+
+Future<List<ReminderOf>> _getRawReminders(Database db, List<Map<String,dynamic>> itemRepr) async {
   List<int> itemIds = itemRepr.map((m) => (m[ID] as int)).toList();
   var results = await db.query(TODO_REMINDERS_TABLE,
       columns: [ID, TODO_REMINDER_TIME, TODO_REMINDER_ITEM],
       where: "$TODO_REMINDER_ITEM in (${itemIds.join(",")})",
       orderBy: TODO_REMINDER_ITEM);
-  return results.map((m) => Reminder(m[ID], DateTime.parse(m[TODO_REMINDER_TIME]), m[TODO_REMINDER_ITEM])).toList();
+  return results.map(_reminderOfFromRepresentation).toList();
 }
 
 class _ItemsQuery {
@@ -629,7 +638,7 @@ class _ItemsQuery {
     var allReminders = (await _getRawReminders(db, results));
     for (final result in results) {
       var id = result[ID];
-      var reminders = allReminders.skipWhile((value) => value.itemId != id).takeWhile((value) => value.itemId==id).map((r) => r.time).toList();
+      var reminders = allReminders.skipWhile((value) => value.itemId != id).takeWhile((value) => value.itemId==id).map((r) => r.reminder).toList();
       items.add(_todoItemFromRepresentation(result, reminders));
     }
     return items;

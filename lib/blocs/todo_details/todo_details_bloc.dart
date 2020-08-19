@@ -32,8 +32,12 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
       yield* _mapUpdateNoteEventToState(event);
     } else if (event is UpdateDueDateEvent) {
       yield* _mapUpdateDueDateEventToState(event);
-    } else if (event is UpdateRemindersEvent) {
-      yield* _mapUpdateRemindersEventToState(event);
+    } else if (event is AddReminderEvent) {
+      yield* _mapAddReminderEventToState(event);
+    } else if (event is UpdateReminderEvent) {
+      yield* _mapUpdateReminderEventToState(event);
+    } else if (event is DeleteReminderEvent) {
+      yield* _mapDeleteReminderEventToState(event);
     } else if (event is AddToListEvent) {
       yield* _mapAddToListEventToState(event);
     } else if (event is RemoveFromListEvent) {
@@ -96,8 +100,29 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _repository.updateTodoItem(_item);
   }
 
-  Stream<TodoDetailsState> _mapUpdateRemindersEventToState(UpdateRemindersEvent event) async* {
-    _item = _item.copyWith(reminders: event.newReminders);
+  Stream<TodoDetailsState> _mapAddReminderEventToState(AddReminderEvent event) async* {
+    // TODO Notify the alarm module about the new reminder
+    var newReminders = List.of(_item.reminders);
+    newReminders.add(event.reminder);
+    _item = _item.copyWith(reminders: newReminders);
+    yield TodoDetailsFullyLoaded(_item, _lists);
+    _notifyList();
+    _repository.updateTodoItem(_item);
+  }
+
+  Stream<TodoDetailsState> _mapUpdateReminderEventToState(UpdateReminderEvent event) async* {
+    // TODO Notify the alarm module about the change
+    var newReminders = _item.reminders.map((r) {return r.id == event.reminder.id ? event.reminder : r;}).toList();
+    _item = _item.copyWith(reminders: newReminders);
+    yield TodoDetailsFullyLoaded(_item, _lists);
+    _notifyList();
+    _repository.updateTodoItem(_item);
+  }
+
+  Stream<TodoDetailsState> _mapDeleteReminderEventToState(DeleteReminderEvent event) async* {
+    // TODO Notify the alarm module about the deleted reminder
+    var newReminders = _item.reminders.where((element) => element.id != event.reminder.id).toList();
+    _item = _item.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     _repository.updateTodoItem(_item);

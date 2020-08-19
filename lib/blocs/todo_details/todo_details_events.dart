@@ -42,13 +42,26 @@ class UpdateDueDateEvent extends TodoDetailsEvent {
   @override
   List<Object> get props => [newDueDate];
 }
-
-class UpdateRemindersEvent extends TodoDetailsEvent {
-  final List<DateTime> newReminders;
-  UpdateRemindersEvent(this.newReminders);
+class AddReminderEvent extends TodoDetailsEvent {
+  final Reminder reminder;
+  AddReminderEvent(this.reminder);
 
   @override
-  List<Object> get props => newReminders;
+  List<Object> get props => [reminder];
+}
+class UpdateReminderEvent extends TodoDetailsEvent {
+  final Reminder reminder;
+  UpdateReminderEvent(this.reminder);
+
+  @override
+  List<Object> get props => [reminder];
+}
+class DeleteReminderEvent extends TodoDetailsEvent {
+  final Reminder reminder;
+  DeleteReminderEvent(this.reminder);
+
+  @override
+  List<Object> get props => [reminder];
 }
 
 class LoadItemEvent extends TodoDetailsEvent {

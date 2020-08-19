@@ -299,7 +299,7 @@ class TodoItemDetailsDueDate extends StatelessWidget {
 }
 
 class TodoItemDetailsReminders extends StatelessWidget {
-  final List<DateTime> reminders;
+  final List<Reminder> reminders;
   TodoItemDetailsReminders(this.reminders);
 
   @override
@@ -311,7 +311,7 @@ class TodoItemDetailsReminders extends StatelessWidget {
         onTap: () => addReminder(context),
       );
     } else {
-      reminders.sort((a, b) => a.compareTo(b));
+      reminders.sort((a, b) => a.at.compareTo(b.at));
       return ListTile(
           leading: Icon(Icons.alarm_add),
           title: Wrap(
@@ -327,14 +327,13 @@ class TodoItemDetailsReminders extends StatelessWidget {
 
   Future<void> addReminder(BuildContext context) async {
     var newReminder = await showDateTimeDialog(context);
-    reminders.add(newReminder);
     BlocProvider.of<TodoDetailsBloc>(context)
-        .add(UpdateRemindersEvent(reminders));
+        .add(AddReminderEvent(Reminder(newReminder)));
   }
 }
 
 class TodoItemDetailsReminderChip extends StatelessWidget {
-  final List<DateTime> reminders;
+  final List<Reminder> reminders;
   final int index;
   TodoItemDetailsReminderChip(this.reminders, this.index);
 
@@ -343,28 +342,26 @@ class TodoItemDetailsReminderChip extends StatelessWidget {
     var reminder = reminders[index];
     return InputChip(
       label: Text(
-          "${formatDate(reminder)}, ${reminder.hour}:${reminder.minute.toString().padLeft(2, "0")}"),
+          "${formatDate(reminder.at)}, ${reminder.at.hour}:${reminder.at.minute.toString().padLeft(2, "0")}"),
       onDeleted: () {
-        reminders.removeAt(index);
         var bloc = BlocProvider.of<TodoDetailsBloc>(context);
-        bloc.add(UpdateRemindersEvent(reminders));
+        bloc.add(DeleteReminderEvent(reminder));
         Scaffold.of(context).showSnackBar(SnackBar(
           content: Text("Reminder deleted"),
           action: SnackBarAction(
             label: "Undo",
             onPressed: () {
               reminders.add(reminder);
-              bloc.add(UpdateRemindersEvent(reminders));
+              bloc.add(AddReminderEvent(reminder));
             },
           ),
         ));
       },
       onPressed: () async {
-        var newReminder = await showDateTimeDialog(context, initial: reminder);
-        if (newReminder != reminder) {
-          reminders[index] = newReminder;
+        var newReminder = await showDateTimeDialog(context, initial: reminder.at);
+        if (newReminder != reminder.at) {
           BlocProvider.of<TodoDetailsBloc>(context)
-              .add(UpdateRemindersEvent(reminders));
+              .add(UpdateReminderEvent(reminder.copyWith(at: newReminder)));
         }
       },
     );
