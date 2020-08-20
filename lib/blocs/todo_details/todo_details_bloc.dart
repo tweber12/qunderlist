@@ -2,6 +2,7 @@ import 'package:bloc/bloc.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_events.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_states.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
+import 'package:qunderlist/pigeon.dart';
 import 'package:qunderlist/repository/repository.dart';
 
 class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,TodoDetailsState> {
@@ -112,6 +113,14 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _item = _item.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
+    Api api = Api();
+    SetReminder r = SetReminder()
+      ..reminderId = id
+      ..itemId = _item.id
+      ..itemName = _item.todo
+      ..itemNote = _item.note
+      ..time = event.reminder.at.toIso8601String();
+    await api.setReminder(r);
   }
 
   Stream<TodoDetailsState> _mapUpdateReminderEventToState(UpdateReminderEvent event) async* {

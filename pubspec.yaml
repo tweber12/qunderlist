@@ -30,6 +30,7 @@ dependencies:
   flutter_reorderable_list: ^0.1.4
   reorderables: ^0.3.2
   mutex: ^1.1.0
+  pigeon: ^0.1.4
 
 dev_dependencies:
   flutter_test:

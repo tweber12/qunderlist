@@ -1,9 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
+import 'package:qunderlist/pigeon.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
+import 'package:qunderlist/screens/todo_item_screen.dart';
 import 'package:qunderlist/screens/todo_lists_screen.dart';
+
+class Notifier extends DartApi {
+  BuildContext context;
+  Notifier(this.context);
+
+  void notificationCallback(ItemId id) {
+    var repository = RepositoryProvider.of<TodoRepository>(context);
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (context) => showTodoItemScreen(context, repository, itemId: id.id)
+    ));
+  }
+}
+
+class TestScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("TestScreen"),),
+    );
+  }
+}
+
 
 void main() {
   runApp(MyApp());
@@ -45,7 +69,23 @@ class RepositoryHomePage extends StatelessWidget {
     );
   }
 }
-class ListHomePage extends StatelessWidget {
+class ListHomePage extends StatefulWidget {
+  @override
+  _ListHomePageState createState() => _ListHomePageState();
+}
+
+class _ListHomePageState extends State<ListHomePage> {
+  Notifier dartApi;
+  Api api;
+
+  @override
+  void initState() {
+    super.initState();
+    api = Api();
+    dartApi = Notifier(context);
+    DartApi.setup(dartApi);
+    api.ready();
+  }
   Widget build(BuildContext context) {
     return BlocProvider<TodoListsBloc>(
       create: (context) {
