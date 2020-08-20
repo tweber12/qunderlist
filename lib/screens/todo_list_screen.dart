@@ -210,7 +210,7 @@ class TodoListItemCard extends StatelessWidget {
                   child: center,
                   onTap: () async {
                     var bloc = BlocProvider.of<TodoListBloc>(context);
-                    TodoItem updatedItem = await Navigator.push(context, MaterialPageRoute(builder: (context) => showTodoItemScreen(context, item, index: index, todoListBloc: bloc)));
+                    TodoItem updatedItem = await Navigator.push(context, MaterialPageRoute(builder: (context) => showTodoItemScreen(context, initialItem: item, index: index, todoListBloc: bloc)));
                   },
                 )
             ),

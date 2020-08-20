@@ -5,18 +5,20 @@ import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/repository/repository.dart';
 
 class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,TodoDetailsState> {
+  int _itemId;
   TodoItem _item;
   List<TodoList> _lists;
   final int _index;
   final TodoListBloc _listBloc;
   final R _repository;
 
-  TodoDetailsBloc(R repository, TodoItem item, int index, TodoListBloc listBloc):
+  TodoDetailsBloc(R repository, int itemId, {TodoItem item, int index, TodoListBloc listBloc}):
         _repository=repository,
         _index = index,
         _listBloc=listBloc,
         _item=item,
-        super(TodoDetailsLoadedItem(item));
+        _itemId = itemId,
+        super(item==null ? TodoDetailsLoading() : TodoDetailsLoadedItem(item));
 
   @override
   Stream<TodoDetailsState> mapEventToState(TodoDetailsEvent event) async* {
@@ -54,6 +56,9 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   }
 
   Stream<TodoDetailsState> _mapLoadItemEventToState(LoadItemEvent event) async* {
+    if (_item == null) {
+      _item = await _repository.getTodoItem(_itemId);
+    }
     if (_lists == null) {
       _lists = await _repository.getListsOfItem(_item.id);
     }

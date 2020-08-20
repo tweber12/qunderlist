@@ -6,8 +6,8 @@ import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 
-Widget showTodoItemScreen(BuildContext context, TodoItem initialItem,
-    {TodoListBloc todoListBloc, int index}) {
+Widget showTodoItemScreen(BuildContext context, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc, int index}) {
+  assert(itemId != null || initialItem != null);
   return WillPopScope(
       onWillPop: () {
         print("ON WILL POP");
@@ -16,8 +16,13 @@ Widget showTodoItemScreen(BuildContext context, TodoItem initialItem,
       },
       child: BlocProvider<TodoDetailsBloc>(
         create: (context) {
-          var bloc =
-              TodoDetailsBloc(TodoRepositorySqflite.getInstance(), initialItem, index, todoListBloc);
+          var bloc = TodoDetailsBloc(
+              TodoRepositorySqflite.getInstance(),
+              itemId ?? initialItem.id,
+              item: initialItem,
+              index: index,
+              listBloc: todoListBloc
+          );
           bloc.add(LoadItemEvent());
           return bloc;
         },
@@ -30,18 +35,29 @@ class TodoItemDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<TodoDetailsBloc, TodoDetailsState>(
       builder: (context, state) {
+        if (state is TodoDetailsLoading) {
+          return Scaffold(
+            body: LinearProgressIndicator(),
+          );
+        }
+        TodoItem item;
+        if (state is TodoDetailsLoadedItem) {
+          item = state.item;
+        } else if (state is TodoDetailsFullyLoaded) {
+          item = state.item;
+        }
         print("REBUILDING MAIN");
         return Scaffold(
             body: CustomScrollView(
               slivers: <Widget>[
                 SliverAppBar(
                   actions: <Widget>[
-                    InfoButton(state.item),
-                    ExtraActionsButton(state.item)
+                    InfoButton(item),
+                    ExtraActionsButton(item)
                   ],
                   expandedHeight: 140,
                   flexibleSpace: FlexibleSpaceBar(
-                    title: ShowTitle(state.item),
+                    title: ShowTitle(item),
                     titlePadding: EdgeInsets.symmetric(
                         horizontal: 40, vertical: 18),
                   ),
@@ -53,13 +69,13 @@ class TodoItemDetailScreen extends StatelessWidget {
                       Divider(
                         height: 8,
                       ),
-                      TodoItemDetailsCompleted(state.item.completed),
-                      TodoItemDetailsPriority(state.item.priority),
+                      TodoItemDetailsCompleted(item.completed),
+                      TodoItemDetailsPriority(item.priority),
                       Divider(),
-                      TodoItemDetailsDueDate(state.item.dueDate),
-                      TodoItemDetailsReminders(state.item.reminders),
+                      TodoItemDetailsDueDate(item.dueDate),
+                      TodoItemDetailsReminders(item.reminders),
                       Divider(),
-                      TodoItemDetailsNotes(state.item.note),
+                      TodoItemDetailsNotes(item.note),
                     ])
                 ),
               ],
@@ -76,10 +92,10 @@ class TodoItemDetailsLists extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     print("REPAINT");
-    if (state is TodoDetailsLoadedItem) {
+    if (state is TodoDetailsLoadedItem || state is TodoDetailsLoading) {
       return SizedBox(
         height: height,
-        child: CircularProgressIndicator(),
+        child: Center(child: CircularProgressIndicator()),
       );
     } else {
       List<TodoList> lists;
