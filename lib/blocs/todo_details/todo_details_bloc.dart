@@ -106,13 +106,12 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   }
 
   Stream<TodoDetailsState> _mapAddReminderEventToState(AddReminderEvent event) async* {
-    // TODO Notify the alarm module about the new reminder
+    var id = await _repository.addReminder(_item.id, event.reminder.at);
     var newReminders = List.of(_item.reminders);
-    newReminders.add(event.reminder);
+    newReminders.add(event.reminder.withId(id));
     _item = _item.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
-    _repository.updateTodoItem(_item);
   }
 
   Stream<TodoDetailsState> _mapUpdateReminderEventToState(UpdateReminderEvent event) async* {
@@ -121,7 +120,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _item = _item.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
-    _repository.updateTodoItem(_item);
+    _repository.updateReminder(event.reminder.id, event.reminder.at);
   }
 
   Stream<TodoDetailsState> _mapDeleteReminderEventToState(DeleteReminderEvent event) async* {
@@ -130,7 +129,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _item = _item.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
-    _repository.updateTodoItem(_item);
+    _repository.deleteReminder(event.reminder.id);
   }
 
   Stream<TodoDetailsState> _mapAddToListEventToState(AddToListEvent event) async* {

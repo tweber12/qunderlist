@@ -64,13 +64,16 @@ class TodoRepositorySqflite implements TodoRepository {
   }
 
   @override
-  Future<void> updateTodoItem(TodoItem item) async {
+  Future<TodoItem> updateTodoItem(TodoItem item, {bool updateReminders=false}) async {
     var db = await _db;
     await db.transaction((txn) async {
       await txn.update(TODO_ITEMS_TABLE, _todoItemToRepresentation(item),
           where: "$ID = ?", whereArgs: [item.id]);
-      await _updateReminders(item.id, item.reminders, txn: txn);
+      if (updateReminders) {
+        await _updateReminders(item.id, item.reminders, txn: txn);
+      }
     });
+    return getTodoItem(item.id);
   }
 
   @override
@@ -342,6 +345,22 @@ class TodoRepositorySqflite implements TodoRepository {
     return moveItemInList(item, listId, moveTo);
   }
 
+  @override
+  Future<int> addReminder(int itemId, DateTime at) async {
+    var db = await _db;
+    return db.insert(TODO_REMINDERS_TABLE, {TODO_REMINDER_ITEM: itemId, TODO_REMINDER_TIME: at.toIso8601String()});
+  }
+  @override
+  Future<void> updateReminder(int reminderId, DateTime at) async {
+    var db = await _db;
+    return db.update(TODO_REMINDERS_TABLE, {TODO_REMINDER_TIME: at.toIso8601String()}, where: "ID = ?", whereArgs: [reminderId]);
+  }
+  @override
+  Future<void> deleteReminder(int reminderId) async {
+    var db = await _db;
+    return db.delete(TODO_REMINDERS_TABLE, where: "ID = ?", whereArgs: [reminderId]);
+  }
+
   Future<void> _removeTodoItemFromList(Transaction txn, int listId, int itemId,
       {bool recursive = false}) async {
     await txn.rawUpdate("""
@@ -402,7 +421,9 @@ class TodoRepositorySqflite implements TodoRepository {
     var db = txn ?? await _db;
     var batch = db.batch();
     for (final reminder in reminders) {
-      batch.insert(TODO_REMINDERS_TABLE, _reminderToRepresentation(reminder));
+      var representation = _reminderToRepresentation(reminder);
+      representation[TODO_REMINDER_ITEM] = itemId;
+      batch.insert(TODO_REMINDERS_TABLE, representation);
     }
     await batch.commit();
   }
@@ -568,7 +589,11 @@ Reminder _reminderFromRepresentation(Map<String,dynamic> representation) {
 }
 
 Map<String,dynamic> _reminderToRepresentation(Reminder reminder) {
-  return { ID: reminder.id, TODO_REMINDER_TIME: reminder.at.toIso8601String() };
+  Map<String,dynamic> map = { TODO_REMINDER_TIME: reminder.at.toIso8601String() };
+  if (reminder.id != null && reminder.id != 0) {
+    map[ID] = reminder.id;
+  }
+  return map;
 }
 
 class ReminderOf {
