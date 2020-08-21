@@ -1,33 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/pigeon.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
+import 'package:qunderlist/screens/todo_list_screen.dart';
 import 'package:qunderlist/screens/todo_lists_screen.dart';
 
 class Notifier extends DartApi {
   BuildContext context;
   Notifier(this.context);
 
-  void notificationCallback(ItemId id) {
+  Future<void> showItem(int itemId) async {
     var repository = RepositoryProvider.of<TodoRepository>(context);
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (context) => showTodoItemScreen(context, repository, itemId: id.id)
-    ));
-  }
-}
-
-class TestScreen extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("TestScreen"),),
+    var list = (await repository.getListsOfItem(itemId)).first;
+    var bloc = TodoListBloc(repository, list);
+    bloc.add(GetDataEvent(filter: TodoStatusFilter.active));
+    var navigator = Navigator.of(context);
+    navigator.pushAndRemoveUntil(
+        MaterialPageRoute(
+            builder: (context) => showTodoListScreenExternal(context, repository, bloc)
+        ),
+            (route) => route.settings.name == "/"
+    );
+    navigator.push(
+      MaterialPageRoute(
+          builder: (context) => showTodoItemScreen(context, repository, itemId: itemId, todoListBloc: bloc)
+      ),
     );
   }
-}
 
+  void notificationCallback(ItemId id) {
+    showItem(id.id);
+  }
+}
 
 void main() {
   runApp(MyApp());
