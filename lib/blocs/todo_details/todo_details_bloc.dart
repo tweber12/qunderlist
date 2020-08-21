@@ -119,7 +119,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
       ..itemId = _item.id
       ..itemName = _item.todo
       ..itemNote = _item.note
-      ..time = event.reminder.at.toIso8601String();
+      ..time = event.reminder.at.millisecondsSinceEpoch;
     await api.setReminder(r);
   }
 
