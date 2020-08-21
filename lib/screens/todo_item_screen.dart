@@ -6,18 +6,14 @@ import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 
-Widget showTodoItemScreen(BuildContext context, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc, int index}) {
+Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc, int index}) {
   assert(itemId != null || initialItem != null);
-  return WillPopScope(
-      onWillPop: () {
-        print("ON WILL POP");
-//        todoListBloc?.add(ReloadDataEvent());
-        return Future.value(true);
-      },
+  return RepositoryProvider.value(
+      value: repository,
       child: BlocProvider<TodoDetailsBloc>(
         create: (context) {
           var bloc = TodoDetailsBloc(
-              TodoRepositorySqflite.getInstance(),
+              repository,
               itemId ?? initialItem.id,
               item: initialItem,
               index: index,
@@ -27,7 +23,8 @@ Widget showTodoItemScreen(BuildContext context, {int itemId, TodoItem initialIte
           return bloc;
         },
         child: TodoItemDetailScreen(),
-      ));
+      )
+  );
 }
 
 class TodoItemDetailScreen extends StatelessWidget {

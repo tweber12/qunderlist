@@ -2,21 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
-import 'package:qunderlist/repository/models.dart';
 import 'package:qunderlist/repository/repository.dart';
-import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
 
-Widget showTodoListScreen(BuildContext context, TodoList initialList) {
+Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, R repository, TodoList initialList) {
   TodoStatusFilter initialFilter = TodoStatusFilter.active;
-  return BlocProvider<TodoListBloc>(
-    create: (context) {
-      var bloc = TodoListBloc(TodoRepositorySqflite.getInstance(), initialList);
-      bloc.add(GetDataEvent(filter: initialFilter));
-      return bloc;
-    },
-    child: TodoListScreen(initialFilter),
+  return RepositoryProvider.value(
+    value: repository,
+    child: BlocProvider<TodoListBloc>(
+      create: (context) {
+        var bloc = TodoListBloc(repository, initialList);
+        bloc.add(GetDataEvent(filter: initialFilter));
+        return bloc;
+      },
+      child: TodoListScreen(initialFilter),
+    )
+  );
+}
+
+Widget showTodoListScreenExternal<R extends TodoRepository>(BuildContext context, R repository, TodoListBloc bloc) {
+  TodoStatusFilter initialFilter = TodoStatusFilter.active;
+  return RepositoryProvider.value(
+      value: repository,
+      child: BlocProvider<TodoListBloc>.value(
+        value: bloc,
+        child: TodoListScreen(bloc.filter),
+      )
   );
 }
 
@@ -209,8 +221,8 @@ class TodoListItemCard extends StatelessWidget {
                 child: InkWell(
                   child: center,
                   onTap: () async {
-                    var bloc = BlocProvider.of<TodoListBloc>(context);
-                    TodoItem updatedItem = await Navigator.push(context, MaterialPageRoute(builder: (context) => showTodoItemScreen(context, initialItem: item, index: index, todoListBloc: bloc)));
+                    var repository = RepositoryProvider.of<TodoRepository>(context);
+                    await Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoItemScreen(ctx, repository, initialItem: item, index: index, todoListBloc: BlocProvider.of<TodoListBloc>(context))));
                   },
                 )
             ),

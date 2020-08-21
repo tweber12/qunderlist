@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
+import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 import 'package:qunderlist/screens/todo_lists_screen.dart';
 
@@ -30,17 +31,25 @@ class MyApp extends StatelessWidget {
         // closer together (more dense) than on mobile platforms.
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: PointlessHomePage(),
+      home: RepositoryHomePage(),
     );
   }
 }
 
-class PointlessHomePage extends StatelessWidget {
+class RepositoryHomePage extends StatelessWidget {
   @override
+  Widget build(BuildContext context) {
+    return RepositoryProvider<TodoRepository>(
+        create: (_) => TodoRepositorySqflite.getInstance(),
+        child: ListHomePage()
+    );
+  }
+}
+class ListHomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider<TodoListsBloc>(
       create: (context) {
-        var bloc = TodoListsBloc(TodoRepositorySqflite.getInstance());
+        var bloc = TodoListsBloc(RepositoryProvider.of<TodoRepository>(context));
         bloc.add(LoadTodoListsEvent());
         return bloc;
       },
