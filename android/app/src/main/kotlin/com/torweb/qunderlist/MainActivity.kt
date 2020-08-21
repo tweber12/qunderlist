@@ -52,6 +52,21 @@ class MainActivity: FlutterActivity() {
                     pendingIntent
             )
         }
+
+        override fun updateReminder(arg: Pigeon.SetReminder?) {
+            setReminder(arg)
+        }
+
+        override fun deleteReminder(arg: Pigeon.DeleteReminder?) {
+            if (arg == null || arg.reminderId == null) {
+                return;
+            }
+            val intent = Intent(applicationContext(), AlarmService::class.java)
+            val pendingIntent: PendingIntent = PendingIntent.getBroadcast(applicationContext(), arg.reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
+            val alarmManager = instance?.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarmManager.cancel(pendingIntent)
+        }
+
         override fun ready() {
             dartReady = true
             if (callback != null) {

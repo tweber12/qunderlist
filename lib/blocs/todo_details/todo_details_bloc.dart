@@ -2,6 +2,7 @@ import 'package:bloc/bloc.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_events.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_states.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
+import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/pigeon.dart';
 import 'package:qunderlist/repository/repository.dart';
 
@@ -12,6 +13,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   int _index;
   final TodoListBloc _listBloc;
   final R _repository;
+  final Api api;
 
   TodoDetailsBloc(R repository, int itemId, {TodoItem item, int index, TodoListBloc listBloc}):
         _repository=repository,
@@ -19,6 +21,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
         _listBloc=listBloc,
         _item=item,
         _itemId = itemId,
+        api = Api(),
         super(item==null ? TodoDetailsLoading() : TodoDetailsLoadedItem(item));
 
   @override
@@ -72,6 +75,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     _repository.updateTodoItem(_item);
+    updateAllRemindersForNotification(_item);
   }
 
   Stream<TodoDetailsState> _mapUpdatePriorityEventToState(UpdatePriorityEvent event) async* {
@@ -84,8 +88,10 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapToggleCompletedEventToState(ToggleCompletedEvent event) async* {
     if (_item.completed) {
       _item = _item.copyWith(completed: false, completedOn: null);
+      setAllNotificationsForItem(_item);
     } else {
       _item = _item.copyWith(completed: true, completedOn: DateTime.now());
+      cancelAllNotificationsForItem(_item);
     }
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
@@ -97,6 +103,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     _repository.updateTodoItem(_item);
+    updateAllRemindersForNotification(_item);
   }
 
   Stream<TodoDetailsState> _mapUpdateDueDateEventToState(UpdateDueDateEvent event) async* {
@@ -113,32 +120,25 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _item = _item.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
-    Api api = Api();
-    SetReminder r = SetReminder()
-      ..reminderId = id
-      ..itemId = _item.id
-      ..itemName = _item.todo
-      ..itemNote = _item.note
-      ..time = event.reminder.at.millisecondsSinceEpoch;
-    await api.setReminder(r);
+    setNotificationForItem(_item, event.reminder.withId(id));
   }
 
   Stream<TodoDetailsState> _mapUpdateReminderEventToState(UpdateReminderEvent event) async* {
-    // TODO Notify the alarm module about the change
     var newReminders = _item.reminders.map((r) {return r.id == event.reminder.id ? event.reminder : r;}).toList();
     _item = _item.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     _repository.updateReminder(event.reminder.id, event.reminder.at);
+    updateNotificationForItem(_item, event.reminder);
   }
 
   Stream<TodoDetailsState> _mapDeleteReminderEventToState(DeleteReminderEvent event) async* {
-    // TODO Notify the alarm module about the deleted reminder
     var newReminders = _item.reminders.where((element) => element.id != event.reminder.id).toList();
     _item = _item.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     _repository.deleteReminder(event.reminder.id);
+    cancelNotificationForItem(event.reminder.id);
   }
 
   Stream<TodoDetailsState> _mapAddToListEventToState(AddToListEvent event) async* {
@@ -171,6 +171,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapDeleteEventToState(DeleteEvent event) async* {
     _notifyList();
     await _repository.deleteTodoItem(_item);
+    cancelAllNotificationsForItem(_item);
   }
 
   Future<void> _notifyList() async {

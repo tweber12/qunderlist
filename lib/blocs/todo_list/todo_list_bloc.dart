@@ -4,6 +4,7 @@ import 'package:bloc/bloc.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_events.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_states.dart';
+import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 
 class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoListStates> {
@@ -49,6 +50,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     yield TodoListLoaded(_list, cache);
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {
+    await cancelAllNotificationsForList(_list, _repository);
     await _repository.deleteTodoList(_list);
     yield TodoListDeleted();
   }
@@ -93,19 +95,23 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     var id = await _repository.addTodoItem(event.item, _list.id);
     cache = cache.addElement(cache.totalNumberOfItems, event.item.copyWith(id: id));
     yield TodoListLoaded(_list, cache);
+    setAllNotificationsForItem(event.item);
   }
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
     cache = cache.removeElement(event.index);
     yield TodoListLoaded(_list, cache);
     await _repository.removeTodoItemFromList(event.item, _list.id);
+    cancelAllNotificationsForItem(event.item);
   }
   Stream<TodoListStates> _mapCompleteItemEventToState(CompleteItemEvent event) async* {
     var newItem = event.item.toggleCompleted();
     if (filter == TodoStatusFilter.active || filter == TodoStatusFilter.completed) {
       // In these two cases, the item won't be included in the list anymore
       cache = cache.removeElement(event.index);
+      cancelAllNotificationsForItem(event.item);
     } else {
       cache = cache.updateElement(event.index, newItem);
+      setAllNotificationsForItem(event.item);
     }
     yield TodoListLoaded(_list, cache);
     await _repository.updateTodoItem(newItem);

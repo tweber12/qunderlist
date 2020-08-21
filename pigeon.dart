@@ -15,6 +15,9 @@ class SetReminder {
   String itemNote;
   int time;
 }
+class DeleteReminder {
+  int reminderId;
+}
 
 @FlutterApi()
 abstract class DartApi {
@@ -25,4 +28,6 @@ abstract class DartApi {
 abstract class Api {
   void ready();
   void setReminder(SetReminder reminder);
+  void updateReminder(SetReminder reminder);
+  void deleteReminder(DeleteReminder reminder);
 }

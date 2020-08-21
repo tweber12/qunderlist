@@ -2,6 +2,7 @@ import 'package:bloc/bloc.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_lists/todo_lists_events.dart';
 import 'package:qunderlist/blocs/todo_lists/todo_lists_states.dart';
+import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 
 class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, TodoListsStates> {
@@ -41,6 +42,7 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
   Stream<TodoListsStates> _mapTodoListDeletedEventToState(TodoListDeletedEvent event) async* {
     cache = cache.removeElement(event.index);
     yield TodoListsLoaded(cache);
+    await cancelAllNotificationsForList(event.list, _repository);
     await _repository.deleteTodoList(event.list);
   }
 
