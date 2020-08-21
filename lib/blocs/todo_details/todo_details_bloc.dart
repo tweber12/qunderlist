@@ -8,7 +8,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   int _itemId;
   TodoItem _item;
   List<TodoList> _lists;
-  final int _index;
+  int _index;
   final TodoListBloc _listBloc;
   final R _repository;
 
@@ -164,9 +164,13 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     await _repository.deleteTodoItem(_item);
   }
 
-  void _notifyList() {
+  Future<void> _notifyList() async {
     if (_listBloc == null) {
       return;
+    }
+    if (_index == null) {
+      // The indices used by the repository are 1 based
+      _index = (await _repository.getPositionOfItemInList(_item.id, _listBloc.listId) - 1);
     }
     _listBloc.add(NotifyItemUpdateEvent(_index, _item, _lists));
   }
@@ -174,7 +178,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   @override
   Future<void> close() {
     print("Close called");
-    _listBloc.add(NotifyItemUpdateEvent(_index, _item, _lists));
+    _notifyList();
     return super.close();
   }
 }

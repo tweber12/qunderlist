@@ -19,6 +19,7 @@ abstract class TodoRepository {
   Future<List<int>> getTodoItemsOfList(int listId, {TodoStatusFilter filter});
   Future<List<TodoItem>> getTodoItemsOfListChunk(int listId, int start, int end, {TodoStatusFilter filter});
   Future<List<TodoList>> getListsOfItem(int itemId);
+  Future<int> getPositionOfItemInList(int itemId, int listId);
 
   Future<void> addTodoItemToList(TodoItem item, int listId);
   Future<void> removeTodoItemFromList(TodoItem item, int listId);
