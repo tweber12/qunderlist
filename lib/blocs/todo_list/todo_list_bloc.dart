@@ -18,6 +18,10 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
 
   int get listId => _list.id;
 
+  int findItemIndex(int itemId) {
+    return cache.findItem((item) => item.id == itemId);
+  }
+
   @override
   Stream<TodoListStates> mapEventToState(TodoListEvent event) async* {
     if (event is RenameListEvent) {
@@ -51,14 +55,14 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {
     await cancelAllNotificationsForList(_list, _repository);
-    await _repository.deleteTodoList(_list);
+    await _repository.deleteTodoList(_list.id);
     yield TodoListDeleted();
   }
   Stream<TodoListStates> _mapGetDataEventToState(GetDataEvent event) async* {
     yield* _updateCache(event.filter, event.ordering);
   }
   Stream<TodoListStates> _mapNotifyItemUpdateEventToState(NotifyItemUpdateEvent event) async* {
-    if (event.index < cache.chainStart || event.index > cache.chainEnd) {
+    if (event.index == null || event.index < cache.chainStart || event.index > cache.chainEnd) {
       // There is a corner case where the element was at the last position and removed
       // In that case the element index is not contained in the cached range anymore
       // That is what the slightly extended range is for
@@ -100,7 +104,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
     cache = cache.removeElement(event.index);
     yield TodoListLoaded(_list, cache);
-    await _repository.removeTodoItemFromList(event.item, _list.id);
+    await _repository.removeTodoItemFromList(event.item.id, _list.id);
     cancelAllNotificationsForItem(event.item);
   }
   Stream<TodoListStates> _mapCompleteItemEventToState(CompleteItemEvent event) async* {
@@ -137,7 +141,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     cache = newCache;
     yield TodoListLoaded(_list, cache);
     var moveToItem = await oldCache.peekItem(event.moveTo);
-    await _repository.moveItemInList(item, _list.id, moveToItem.id);
+    await _repository.moveTodoItemInList(item.id, _list.id, moveToItem.id);
   }
   Stream<TodoListStates> _mapUpdateFilterEventToState(UpdateFilterEvent event) async* {
     yield* _updateCache(event.filter, ordering);
@@ -149,9 +153,9 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     }
     this.filter = filter;
     this.ordering = ordering;
-    var totalLength = await _repository.getNumberOfItems(_list.id, filter: filter);
+    var totalLength = await _repository.getNumberOfTodoItems(_list.id, filter);
     Future<List<TodoItem>> underlyingData(int start, int end) {
-      return _repository.getTodoItemsOfListChunk(_list.id, start, end, filter: filter);
+      return _repository.getTodoItemsOfListChunk(_list.id, start, end, filter);
     }
     cache = ListCache(underlyingData, totalLength);
     await cache.init(0);

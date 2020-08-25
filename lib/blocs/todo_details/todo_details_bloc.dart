@@ -145,21 +145,21 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _lists = [..._lists, event.list];
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
-    _repository.addTodoItemToList(_item, event.list.id);
+    _repository.addTodoItemToList(_item.id, event.list.id);
   }
 
   Stream<TodoDetailsState> _mapRemoveFromListEventToState(RemoveFromListEvent event) async* {
     _lists = _lists.where((element) => element.id != event.listId).toList();
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
-    _repository.removeTodoItemFromList(_item, event.listId);
+    _repository.removeTodoItemFromList(_item.id, event.listId);
   }
 
   Stream<TodoDetailsState> _mapMoveToListEventToState(MoveToListEvent event) async* {
     _lists = [event.newList, ..._lists.where((element) => element.id != event.oldListId)];
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
-    _repository.moveTodoItemToList(_item, event.oldListId, event.newList.id);
+    _repository.moveTodoItemToList(_item.id, event.oldListId, event.newList.id);
   }
 
   Stream<TodoDetailsState> _mapCopyToListEventToState(CopyToListEvent event) async* {
@@ -170,17 +170,13 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
 
   Stream<TodoDetailsState> _mapDeleteEventToState(DeleteEvent event) async* {
     _notifyList();
-    await _repository.deleteTodoItem(_item);
+    await _repository.deleteTodoItem(_item.id);
     cancelAllNotificationsForItem(_item);
   }
 
   Future<void> _notifyList() async {
     if (_listBloc == null) {
       return;
-    }
-    if (_index == null) {
-      // The indices used by the repository are 1 based
-      _index = (await _repository.getPositionOfItemInList(_item.id, _listBloc.listId) - 1);
     }
     _listBloc.add(NotifyItemUpdateEvent(_index, _item, _lists));
   }

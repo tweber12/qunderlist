@@ -25,7 +25,7 @@ class Notifier extends DartApi {
     );
     navigator.push(
       MaterialPageRoute(
-          builder: (context) => showTodoItemScreen(context, repository, itemId: itemId, todoListBloc: bloc)
+          builder: (context) => showTodoItemScreen(context, repository, itemId: itemId, todoListBloc: bloc, index: bloc.findItemIndex(itemId))
       ),
     );
   }
@@ -52,9 +52,9 @@ void cancelAllNotificationsForItem(TodoItem item) {
 }
 
 Future<void> cancelAllNotificationsForList<R extends TodoRepository>(TodoList list, R repository) async {
-  var totalLength = await repository.getNumberOfItems(list.id, filter: TodoStatusFilter.active);
+  var totalLength = await repository.getNumberOfTodoItems(list.id, TodoStatusFilter.active);
   Future<List<TodoItem>> underlyingData(int start, int end) {
-    return repository.getTodoItemsOfListChunk(list.id, start, end, filter: TodoStatusFilter.active);
+    return repository.getTodoItemsOfListChunk(list.id, start, end, TodoStatusFilter.active);
   }
   var cache = ListCache(underlyingData, totalLength);
   for (int i=0; i<totalLength; i++) {

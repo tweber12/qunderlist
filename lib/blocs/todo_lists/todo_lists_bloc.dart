@@ -43,7 +43,7 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
     cache = cache.removeElement(event.index);
     yield TodoListsLoaded(cache);
     await cancelAllNotificationsForList(event.list, _repository);
-    await _repository.deleteTodoList(event.list);
+    await _repository.deleteTodoList(event.list.id);
   }
 
   Stream<TodoListsStates> _mapReorderTodoListsEventToState(TodoListsReorderedEvent event) async* {
@@ -52,6 +52,6 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
     newCache = newCache.addElement(event.moveTo, list);
     cache = newCache;
     yield TodoListsLoaded(cache);
-    await _repository.moveList(list, event.moveTo+1);
+    await _repository.moveTodoList(list.id, event.moveTo+1);
   }
 }
