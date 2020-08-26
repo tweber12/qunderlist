@@ -38,12 +38,49 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class RepositoryHomePage extends StatelessWidget {
+class RepositoryHomePage extends StatefulWidget {
+  @override
+  _RepositoryHomePageState createState() => _RepositoryHomePageState();
+}
+
+class _RepositoryHomePageState extends State<RepositoryHomePage> {
+  Future<TodoRepository> repository;
+
+  @override
+  void initState() {
+    super.initState();
+    repository = TodoRepositorySqflite.getInstance();
+  }
   @override
   Widget build(BuildContext context) {
-    return RepositoryProvider<TodoRepository>(
-        create: (_) => TodoRepositorySqflite.getInstance(),
-        child: ListHomePage()
+    return FutureBuilder(
+      future: repository,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Scaffold(
+            appBar: AppBar(title: Text("Qunderlist"),),
+            body: Center(
+              child: Column(
+                children: <Widget>[
+                  Icon(Icons.error_outline, size: 96, color: Colors.red,),
+                  Text("Failed to open the database", style: TextStyle(fontSize: 24),),
+                ],
+                mainAxisAlignment: MainAxisAlignment.center,
+              ),
+            ),
+          );
+        }
+        if (!snapshot.hasData) {
+          return Scaffold(
+            appBar: AppBar(title: Text("Qunderlist"),),
+            body: LinearProgressIndicator(),
+          );
+        }
+        return RepositoryProvider<TodoRepository>.value(
+            value: snapshot.data,
+            child: ListHomePage()
+        );
+      },
     );
   }
 }

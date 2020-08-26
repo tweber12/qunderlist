@@ -78,13 +78,12 @@ class TodoListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var repository = RepositoryProvider.of<TodoRepository>(context);
     return Card(
         child: Container(
           height: 70,
           child: Center(child: ListTile(
               title: Text(list.listName, style: TextStyle(fontSize: 16),),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => showTodoListScreen(context, repository, list))),
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, RepositoryProvider.of<TodoRepository>(context), list))),
           ))
         )
     );

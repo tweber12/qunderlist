@@ -1,10 +1,11 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/todo_details.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
-import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 
 Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc, int index}) {
   assert(itemId != null || initialItem != null);
@@ -145,7 +146,7 @@ class TodoItemDetailsListChip extends StatelessWidget {
 
 Future<void> addToList(BuildContext context, {TodoList moveFromList}) async {
   var move = moveFromList != null;
-  AddToList add = await showDialog(context: context, child: TodoItemDetailsAddListDialog(move: move));
+  AddToList add = await showDialog(context: context, child: TodoItemDetailsAddListDialog(RepositoryProvider.of<TodoRepository>(context), move: move));
   if (add == null) {
     return;
   }
@@ -160,7 +161,8 @@ Future<void> addToList(BuildContext context, {TodoList moveFromList}) async {
 
 class TodoItemDetailsAddListDialog extends StatefulWidget {
   final bool move;
-  TodoItemDetailsAddListDialog({this.move = false});
+  final TodoRepository repository;
+  TodoItemDetailsAddListDialog(this.repository, {this.move = false});
   @override
   _TodoItemDetailsAddListDialogState createState() =>
       _TodoItemDetailsAddListDialogState();
@@ -183,7 +185,7 @@ class _TodoItemDetailsAddListDialogState
       title: Text("Add item to list"),
       content: BlocProvider<TodoListsBloc>(
         create: (context) {
-          var bloc = TodoListsBloc(TodoRepositorySqflite.getInstance());
+          var bloc = TodoListsBloc(widget.repository);
           bloc.add(LoadTodoListsEvent());
           return bloc;
         },
@@ -239,7 +241,7 @@ class ListSelector extends StatelessWidget {
           return CircularProgressIndicator();
         }
         var cache = (state as TodoListsLoaded).lists;
-        var lists = [for (int i=0; i<50; i++) cache[i]];
+        var lists = [for (int i=0; i<min(cache.totalNumberOfItems, 10); i++) cache[i]];
         return DropdownButton(
           value: initial,
           items: lists.map((list) => DropdownMenuItem(value: list, child: Text(list.listName),)).toList(),
