@@ -62,7 +62,8 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     yield* _updateCache(event.filter, event.ordering);
   }
   Stream<TodoListStates> _mapNotifyItemUpdateEventToState(NotifyItemUpdateEvent event) async* {
-    if (event.index == null || event.index < cache.chainStart || event.index > cache.chainEnd) {
+    var index = event.index ?? findItemIndex(event.item.id);
+    if (index < cache.chainStart || index > cache.chainEnd) {
       // There is a corner case where the element was at the last position and removed
       // In that case the element index is not contained in the cached range anymore
       // That is what the slightly extended range is for
@@ -73,25 +74,25 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       || (filter==TodoStatusFilter.completed && !event.item.completed)
       || (filter==TodoStatusFilter.important && event.item.priority!=TodoPriority.high)
       || (filter==TodoStatusFilter.withDueDate && event.item.dueDate==null);
-    if (event.index == cache.chainEnd) {
+    if (index == cache.chainEnd) {
       // Handle the corner case of the event being exactly at the end of the chain
       if (!shouldNotBeContained) {
         // If the event should be there and fits exactly at the end of the chain, then add it
-        cache = cache.addElement(event.index, event.item);
+        cache = cache.addElement(index, event.item);
         yield TodoListLoaded(_list, cache);
       }
       // In any case return, so that all events in the remainder of the code fit in the cached range
       return;
     }
-    print("NOTIFY ITEM UPDATE: ${cache[event.index].id == event.item.id}, $shouldNotBeContained");
-    if (cache[event.index].id == event.item.id && shouldNotBeContained) {
+    print("NOTIFY ITEM UPDATE: ${cache[index].id == event.item.id}, $shouldNotBeContained");
+    if (cache[index].id == event.item.id && shouldNotBeContained) {
       print("REMOVING ELEMENT");
-      cache = cache.removeElement(event.index);
-    } else if (cache[event.index].id != event.item.id && !shouldNotBeContained) {
+      cache = cache.removeElement(index);
+    } else if (cache[index].id != event.item.id && !shouldNotBeContained) {
       print("ADDING IT AGAIN");
-      cache = cache.addElement(event.index, event.item);
+      cache = cache.addElement(index, event.item);
     } else {
-      cache = cache.updateElement(event.index, event.item);
+      cache = cache.updateElement(index, event.item);
     }
     yield TodoListLoaded(_list, cache);
   }
@@ -104,8 +105,15 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
     cache = cache.removeElement(event.index);
     yield TodoListLoaded(_list, cache);
-    await _repository.removeTodoItemFromList(event.item.id, _list.id);
-    cancelAllNotificationsForItem(event.item);
+    var numberOfLists = (await _repository.getListsOfItem(event.item.id)).length;
+    if (numberOfLists > 1) {
+      // The item is still contained in other lists, so don't delete it
+      await _repository.removeTodoItemFromList(event.item.id, _list.id);
+    } else {
+      // No other lists contain this item, so delete it and all it's reminders
+      await _repository.deleteTodoItem(event.item.id);
+      cancelAllNotificationsForItem(event.item);
+    }
   }
   Stream<TodoListStates> _mapCompleteItemEventToState(CompleteItemEvent event) async* {
     var newItem = event.item.toggleCompleted();

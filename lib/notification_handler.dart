@@ -25,7 +25,7 @@ class Notifier extends DartApi {
     );
     navigator.push(
       MaterialPageRoute(
-          builder: (context) => showTodoItemScreen(context, repository, itemId: itemId, todoListBloc: bloc, index: bloc.findItemIndex(itemId))
+          builder: (context) => showTodoItemScreen(context, repository, itemId: itemId, todoListBloc: bloc)
       ),
     );
   }

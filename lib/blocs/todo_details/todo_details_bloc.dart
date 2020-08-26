@@ -62,6 +62,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapLoadItemEventToState(LoadItemEvent event) async* {
     if (_item == null) {
       _item = await _repository.getTodoItem(_itemId);
+      yield TodoDetailsLoadedItem(_item);
     }
     if (_lists == null) {
       _lists = await _repository.getListsOfItem(_item.id);
