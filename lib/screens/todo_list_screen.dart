@@ -22,7 +22,6 @@ Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, R repo
 }
 
 Widget showTodoListScreenExternal<R extends TodoRepository>(BuildContext context, R repository, TodoListBloc bloc) {
-  TodoStatusFilter initialFilter = TodoStatusFilter.active;
   return RepositoryProvider.value(
       value: repository,
       child: BlocProvider<TodoListBloc>.value(
@@ -53,7 +52,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    var bottomNavigationBar = BottomNavigationBar(
+    var bottomNavigationBar = () => BottomNavigationBar(
       items: [
         BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.active)), title: Text("Active")),
         BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.completed)), title: Text("Completed")),
@@ -88,7 +87,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
             appBar = AppBar(title: Text(state.list.listName));
             floatingActionButton = FloatingActionButton(child: Icon(Icons.add), onPressed: () {showModalBottomSheet(context: context, builder: (context) => TodoItemAdder(bloc));});
             if (state.items.totalNumberOfItems != 0) {
-              body = TodoListItemList(state.items);
+              body = TodoListItemList(state.items, reorderable: filter==TodoStatusFilter.active);
             } else {
               body = Center(child: Column(children: <Widget>[
                 Icon(_iconForFilter(filter), size: 96),
@@ -105,27 +104,15 @@ class _TodoListScreenState extends State<TodoListScreen> {
           appBar: appBar,
           body: body,
           floatingActionButton: floatingActionButton,
-          bottomNavigationBar: bottomNavigationBar,
+          bottomNavigationBar: bottomNavigationBar(),
         );
       },
     );
   }
 
   void _setFilter(TodoStatusFilter newFilter) {
-    setState(() {
-      filter = newFilter;
-      bloc.add(UpdateFilterEvent(newFilter));
-    });
-  }
-
-  static IconData _iconForFilter(TodoStatusFilter filter) {
-    switch (filter) {
-      case TodoStatusFilter.active: return Icons.radio_button_unchecked;
-      case TodoStatusFilter.completed: return Icons.check_circle_outline;
-      case TodoStatusFilter.important: return Icons.bookmark_border;
-      case TodoStatusFilter.withDueDate: return Icons.date_range;
-      default: throw "BUG: Unsupported filter in List BottomBar";
-    }
+    filter = newFilter;
+    bloc.add(UpdateFilterEvent(newFilter));
   }
 
   static int _filterToBottomBarIndex(TodoStatusFilter filter) {
@@ -154,9 +141,48 @@ class _TodoListScreenState extends State<TodoListScreen> {
   }
 }
 
+IconData _iconForFilter(TodoStatusFilter filter) {
+  switch (filter) {
+    case TodoStatusFilter.active: return Icons.radio_button_unchecked;
+    case TodoStatusFilter.completed: return Icons.check_circle_outline;
+    case TodoStatusFilter.important: return Icons.bookmark_border;
+    case TodoStatusFilter.withDueDate: return Icons.date_range;
+    default: throw "BUG: Unsupported filter in List BottomBar";
+  }
+}
+
+class TodoListItemEmptyList extends StatelessWidget {
+  final TodoStatusFilter filter;
+  TodoListItemEmptyList(this.filter);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        children: <Widget>[
+          Icon(_iconForFilter(filter), size: 96),
+          Text(_messageForFilter(), style: TextStyle(fontSize: 24),),
+        ],
+        mainAxisAlignment: MainAxisAlignment.center,
+      ),
+    );
+  }
+
+  String _messageForFilter() {
+    switch (filter) {
+      case TodoStatusFilter.active: return "Nothing to do";
+      case TodoStatusFilter.completed: return "Nothing done yet ;)";
+      case TodoStatusFilter.important: return "No important tasks";
+      case TodoStatusFilter.withDueDate: return "No scheduled tasks";
+      default: throw "BUG: Unsupported filter used in list screen";
+    }
+  }
+}
+
 class TodoListItemList extends StatelessWidget {
   final ListCache<TodoItem> items;
-  TodoListItemList(this.items);
+  final bool reorderable;
+  TodoListItemList(this.items, {this.reorderable=false});
 
   @override
   Widget build(BuildContext context) {
@@ -173,8 +199,8 @@ class TodoListItemList extends StatelessWidget {
               onDismissed: () => bloc.add(DeleteItemEvent(item, index: index)),
               undoAction: () => bloc.add(AddItemEvent(item)),
           ),
-          reorderCallback: (from, to) => bloc.add(ReorderItemsEvent(from, to)),
-          itemHeight: 50
+          reorderCallback: reorderable ? (from, to) => bloc.add(ReorderItemsEvent(from, to)) : null,
+          itemHeight: 55
       ),
       color: Colors.blue.shade100,
       padding: EdgeInsets.symmetric(horizontal: 8),
@@ -185,63 +211,180 @@ class TodoListItemList extends StatelessWidget {
 class TodoListItemCard extends StatelessWidget {
   final int index;
   final TodoItem item;
+
   TodoListItemCard(this.index, this.item);
 
   @override
   Widget build(BuildContext context) {
-    Widget center;
-    if (item.dueDate != null || item.note != null || item.reminders.isNotEmpty) {
-      center =  Column(
-          children: <Widget>[
-            Text(item.todo, style: TextStyle(fontSize: 15)),
-            Row(
-              children: <Widget>[
-                if (item.dueDate != null) Text(formatDate(item.dueDate), style: TextStyle(fontSize: 13, color: Colors.black54)),
-                if (item.reminders.isNotEmpty) Icon(Icons.alarm, size: 13, color: Colors.black54,),
-                if (item.note != null && item.note != "") Icon(Icons.attach_file, size: 13, color: Colors.black54),
-            ],
-            )
-          ],
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        crossAxisAlignment: CrossAxisAlignment.start,
-      );
-    } else {
-      center = Text(item.todo, style: TextStyle(fontSize: 15));
-    }
     return Card(
-      child: Container(
-        height: 50,
-        child: Row(
-          children: <Widget>[
-            IconButton(
-              icon: Icon(item.completed ? Icons.check_box : Icons.check_box_outline_blank, color: Colors.black54), //item.completed ? Icon(Icons.check_box) : Icon(Icons.check_box_outline_blank),
-              onPressed: () => BlocProvider.of<TodoListBloc>(context).add(CompleteItemEvent(item, index: index)),
-            ),
-            Expanded(
-                child: InkWell(
-                  child: center,
-                  onTap: () async {
-                    var repository = RepositoryProvider.of<TodoRepository>(context);
-                    await Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoItemScreen(ctx, repository, initialItem: item, index: index, todoListBloc: BlocProvider.of<TodoListBloc>(context))));
-                  },
-                )
-            ),
-            Ink(
-              decoration: ShapeDecoration(
-                color: bgColorForPriority(item.priority),
-                shape: CircleBorder(),
-              ),
-              child: IconButton(
-                icon: Icon(Icons.bookmark_border, color: Colors.black54,),
-                color: item.priority==TodoPriority.none ? null : Colors.white,
-                onPressed: () => BlocProvider.of<TodoListBloc>(context).add(UpdateItemPriorityEvent(item, item.priority==TodoPriority.none ? TodoPriority.high : TodoPriority.none, index: index)),
-              ),
-            ),
-          ],
+      child: InkWell(
+        child: Container(
+          height: 55,
+          child: Row(
+            children: <Widget>[
+              _checkbox(context),
+              _itemInfo(context),
+              PriorityButton(item.priority, (priority) => BlocProvider.of<TodoListBloc>(context).add(UpdateItemPriorityEvent(item, priority, index: index))),
+            ],
+          ),
+          padding: EdgeInsets.fromLTRB(0, 0, 8, 0),
         ),
+        onTap: () => _showDetails(context),
       ),
       margin: EdgeInsets.symmetric(vertical: 0.5),
     );
+  }
+
+  Widget _checkbox(BuildContext context) {
+    return IconButton(
+      icon: Icon(item.completed ? Icons.check_circle_outline : Icons
+          .radio_button_unchecked, color: Colors.black54),
+      onPressed: () =>
+          BlocProvider.of<TodoListBloc>(context).add(
+              CompleteItemEvent(item, index: index)),
+    );
+  }
+
+  static const TITLE_FONT_SIZE = 15.0;
+  static const SUB_INFO_SIZE = 13.0;
+  Widget _itemInfo(BuildContext context) {
+    if (item.note == null && item.dueDate == null && item.reminders.isEmpty) {
+      return Expanded(child: Text(item.todo, style: TextStyle(fontSize: TITLE_FONT_SIZE), maxLines: 2, overflow: TextOverflow.ellipsis));
+    }
+    var numReminders = _activeReminders();
+    return Expanded(
+        child: Column(
+          children: [
+            Text(item.todo, style: TextStyle(fontSize: TITLE_FONT_SIZE), maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (item.note != null && item.note != "") Text(item.note, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: SUB_INFO_SIZE, color: Colors.black54),),
+            Row(
+              children: [
+                if (item.dueDate != null) Text(formatDate(item.dueDate), style: TextStyle(fontSize: SUB_INFO_SIZE, color: _dueDateColor(item.dueDate, item.completedOn))),
+                if (item.dueDate != null) Container(width: 5),
+                if (numReminders > 0) Icon(Icons.alarm, size: SUB_INFO_SIZE, color: Colors.black54,),
+                if (numReminders > 0) Text("($numReminders)", style: TextStyle(fontSize: SUB_INFO_SIZE, color: Colors.black54)),
+                if (numReminders > 0) Container(width: 5),
+              ],
+            ),
+          ],
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+        )
+    );
+  }
+
+  int _activeReminders() {
+    var active = 0;
+    for (final reminder in item.reminders) {
+      var now = DateTime.now();
+      if (reminder.at.isAfter(now)) {
+        active += 1;
+      }
+    }
+    return active;
+  }
+
+  Color _dueDateColor(DateTime dueDate, DateTime completed) {
+    var compare = completed ?? DateTime.now();
+    var day = DateTime(compare.year, compare.month, compare.day);
+    if (dueDate.isBefore(day)) {
+      return Colors.red;
+    } else if (dueDate.day == compare.day && dueDate.month == compare.month && dueDate.year == dueDate.year) {
+      return Colors.blue;
+    } else {
+      return Colors.black54;
+    }
+  }
+
+  void _showDetails(BuildContext context) async {
+    await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (ctx) => showTodoItemScreen(
+                ctx,
+                RepositoryProvider.of<TodoRepository>(context),
+                initialItem: item,
+                index: index,
+                todoListBloc: BlocProvider.of<TodoListBloc>(context)
+            )
+        )
+    );
+  }
+}
+
+class PriorityButton extends StatelessWidget {
+  final TodoPriority priority;
+  final Function(TodoPriority newPriority) callback;
+  PriorityButton(this.priority, this.callback);
+
+  static const ICON_SIZE = 24.0;
+  static const ICON_PADDING = 9.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Ink(
+      child: InkResponse(
+        child: Padding(
+          child: priority == TodoPriority.none ?
+            Icon(Icons.bookmark_border, color: Colors.black54, size: ICON_SIZE) :
+            Icon(Icons.bookmark, color: Colors.white, size: ICON_SIZE),
+          padding: EdgeInsets.all(ICON_PADDING),
+        ),
+        onTap: () => callback(priority==TodoPriority.none ? TodoPriority.high : TodoPriority.none),
+        onLongPress: () => _priorityDropdown(context, callback),
+        containedInkWell: true,
+        customBorder: CircleBorder(),
+      ),
+      decoration: ShapeDecoration(
+        color: bgColorForPriority(priority),
+        shape: CircleBorder(),
+      ),
+    );
+  }
+  Future<void> _priorityDropdown(BuildContext context, Function(TodoPriority) callback) async {
+    // Inspired by the PopupMenuButton code
+    final RenderBox button = context.findRenderObject() as RenderBox;
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
+      ),
+      Offset.zero & overlay.size,
+    );
+    var priority = await showMenu<TodoPriority>(
+        context: context,
+        position: position,
+        items: TodoPriority.values.map((p) => _dropdownMenuItem(p)).toList()
+    );
+    callback(priority);
+  }
+  PopupMenuItem<TodoPriority> _dropdownMenuItem(TodoPriority priority) {
+    return PopupMenuItem(
+      value: priority,
+      child: Container(
+        child: Center(
+          child: Text(_priorityDropdownText(priority)),
+        ),
+        decoration: ShapeDecoration(
+          color: bgColorForPriority(priority),
+          shape: StadiumBorder(),
+        ),
+        height: 35,
+        width: 80,
+      ),
+      height: 40,
+    );
+  }
+  String _priorityDropdownText(TodoPriority priority) {
+    switch (priority) {
+      case TodoPriority.none: return "None";
+      case TodoPriority.low: return "Low";
+      case TodoPriority.medium: return "Medium";
+      case TodoPriority.high: return "High";
+      default: throw "BUG: Unsupported priority in priority button";
+    }
   }
 }
 

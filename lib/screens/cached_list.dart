@@ -8,7 +8,68 @@ class CachedList<T> extends StatelessWidget {
   final double itemHeight;
   final Function(int from, int to) reorderCallback;
 
-  CachedList({@required this.cache, @required this.itemBuilder, @required this.reorderCallback, this.itemHeight=50});
+  CachedList({@required this.cache, @required this.itemBuilder, this.reorderCallback, this.itemHeight=50});
+
+  @override
+  Widget build(BuildContext context) {
+    if (reorderCallback == null) {
+      return _buildNonReorderable(context);
+    } else {
+      return _buildReorderable(context);
+    }
+  }
+
+  Widget _buildNonReorderable(BuildContext context) {
+    return ListView.builder(
+        itemBuilder: _wrapItem,
+        itemExtent: itemHeight,
+        itemCount: cache.totalNumberOfItems,
+        padding: EdgeInsets.symmetric(vertical: 6),
+    );
+  }
+
+  Widget _buildReorderable(BuildContext context) {
+    return CustomScrollView(
+      controller: ScrollController(),
+      slivers: <Widget>[
+        SliverPadding(
+            padding: EdgeInsets.symmetric(vertical: 6),
+            sliver: ReorderableSliverList(
+              delegate: ReorderableSliverChildBuilderDelegate(
+                  _wrapItem,
+                  childCount: cache.totalNumberOfItems
+              ),
+              onReorder: reorderCallback,
+            )
+        )
+      ],
+    );
+  }
+
+  Widget _wrapItem(BuildContext context, int index) {
+    var elem = cache[index];
+    if (elem != null) {
+      return itemBuilder(context, index, elem);
+    } else {
+      return FutureBuilder(
+          future: cache.getItem(index),
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              return itemBuilder(context, index, snapshot.data);
+            } else {
+              print("NO DATA: $index, ${cache.getItem(index)}");
+              return SizedBox(child: Center(child: CircularProgressIndicator()), height: itemHeight);
+            }
+          });
+    }
+  }
+}
+
+class CachedListReorderableOld<T> extends CachedList<T> {
+  final Function(int from, int to) reorderCallback;
+
+  CachedListReorderableOld({@required cache, @required itemBuilder, @required this.reorderCallback, itemHeight=50}):
+      super(cache: cache, itemBuilder: itemBuilder, itemHeight: itemHeight);
 
   @override
   Widget build(BuildContext context) {
@@ -16,32 +77,16 @@ class CachedList<T> extends StatelessWidget {
         controller: ScrollController(),
         slivers: <Widget>[
           SliverPadding(
-      padding: EdgeInsets.symmetric(vertical: 6),
-      sliver:
-          ReorderableSliverList(
-          delegate: ReorderableSliverChildBuilderDelegate(
-              (context, index) {
-                print("Building element: $index");
-                var elem = cache[index];
-                if (elem != null) {
-                  return itemBuilder(context, index, elem);
-                } else {
-                  return FutureBuilder(
-                      future: cache.getItem(index),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData) {
-                          return itemBuilder(context, index, snapshot.data);
-                        } else {
-                          print("NO DATA: $index, ${cache.getItem(index)}");
-                          return SizedBox(child: Center(child: CircularProgressIndicator()), height: itemHeight);
-                        }
-                      });
-                }
-              },
-            childCount: cache.totalNumberOfItems
-          ),
-          onReorder: reorderCallback,
-        ))],
+            padding: EdgeInsets.symmetric(vertical: 6),
+            sliver: ReorderableSliverList(
+              delegate: ReorderableSliverChildBuilderDelegate(
+                _wrapItem,
+                childCount: cache.totalNumberOfItems
+              ),
+              onReorder: reorderCallback,
+            )
+          )
+        ],
       );
   }
 }

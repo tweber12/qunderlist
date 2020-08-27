@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
@@ -26,7 +27,11 @@ class TodoListsScreen extends StatelessWidget {
       floatingActionButton: FloatingActionButton(
         child: Icon(Icons.add),
         onPressed: () async {
-          await showModalBottomSheet<bool>(context: context, builder: (_) => TodoListAdder(BlocProvider.of<TodoListsBloc>(context)));
+          await showModalBottomSheet<bool>(
+              context: context,
+              builder: (_) => TodoListAdder(BlocProvider.of<TodoListsBloc>(context)),
+            isScrollControlled:  true
+          );
         },
       ),
     );
@@ -64,9 +69,9 @@ class _TodoListsListViewState extends State<TodoListsListView> {
             confirmMessage: "Delete list '${item.listName}'?",
           ),
           reorderCallback: (from, to) => _bloc.add(TodoListsReorderedEvent(from, to)),
-          itemHeight: 70
+          itemHeight: 50
       ),
-      color: Colors.blue.shade100,
+      color: Colors.blue.shade200,
       padding: EdgeInsets.symmetric(horizontal: 8),
     );
   }
@@ -79,13 +84,15 @@ class TodoListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      child: InkWell(
         child: Container(
-          height: 70,
-          child: Center(child: ListTile(
-              title: Text(list.listName, style: TextStyle(fontSize: 16),),
-              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, RepositoryProvider.of<TodoRepository>(context), list))),
-          ))
-        )
+          height: 50,
+          child: Row(children: [Text(list.listName, style: TextStyle(fontSize: 15))], crossAxisAlignment: CrossAxisAlignment.center,),
+          padding: EdgeInsets.symmetric(horizontal: 16),
+        ),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, RepositoryProvider.of<TodoRepository>(context), list))),
+      ),
+      margin: EdgeInsets.symmetric(vertical: 0.5),
     );
   }
 }
@@ -114,16 +121,22 @@ class _TodoListAdderState extends State<TodoListAdder> {
     print(title);
     // TODO Figure out what to do with the chunk size
     var action = () {widget.bloc.add(TodoListAddedEvent(TodoList(title))); Navigator.pop(context, true);};
-    return Column(
-      children: <Widget>[
-        ListTile(title: TextField(controller: titleController, autofocus: true, decoration: InputDecoration(labelText: "List title"),)),
-        Row(
-          children: <Widget>[
-            RaisedButton(child: Text("Create List"), onPressed: title.isEmpty ? null : action),
-          ],
-          mainAxisAlignment: MainAxisAlignment.end,
-        ),
-      ],
+    return Container(
+      child: Column(
+        children: <Widget>[
+          ListTile(
+              title: TextField(controller: titleController, autofocus: true, decoration: InputDecoration(labelText: "List title"),)
+          ),
+          Row(
+            children: <Widget>[
+              RaisedButton(child: Text("Create List"), onPressed: title.isEmpty ? null : action),
+            ],
+            mainAxisAlignment: MainAxisAlignment.end,
+          ),
+        ],
+        mainAxisSize: MainAxisSize.min,
+      ),
+      padding: EdgeInsets.fromLTRB(10, 3, 10, MediaQuery.of(context).viewInsets.bottom+9),
     );
   }
 }
