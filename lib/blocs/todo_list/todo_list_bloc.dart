@@ -117,16 +117,17 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   }
   Stream<TodoListStates> _mapCompleteItemEventToState(CompleteItemEvent event) async* {
     var newItem = event.item.toggleCompleted();
-    if (filter == TodoStatusFilter.active || filter == TodoStatusFilter.completed) {
-      // In these two cases, the item won't be included in the list anymore
-      cache = cache.removeElement(event.index);
+    // There's not a single view which shows completed and uncompleted items, so remove it since it must've been visible before
+    cache = cache.removeElement(event.index);
+    yield TodoListLoaded(_list, cache);
+    _repository.updateTodoItem(newItem);
+    if (newItem.completed) {
+      // The event has been completed, so remove all notifications
       cancelAllNotificationsForItem(event.item);
     } else {
-      cache = cache.updateElement(event.index, newItem);
+      // The event has been activated again, so activate all notifications as well
       setAllNotificationsForItem(event.item);
     }
-    yield TodoListLoaded(_list, cache);
-    await _repository.updateTodoItem(newItem);
   }
   Stream<TodoListStates> _mapUpdateItemPriorityEventToState(UpdateItemPriorityEvent event) async* {
     var newItem = event.item.copyWith(priority: event.priority);

@@ -41,7 +41,10 @@ void setAllNotificationsForItem(TodoItem item) {
     return;
   }
   for (var reminder in item.reminders) {
-    setNotificationForItem(item, reminder);
+    var now = DateTime.now();
+    if (reminder.at.isAfter(now)) {
+      setNotificationForItem(item, reminder);
+    }
   }
 }
 
