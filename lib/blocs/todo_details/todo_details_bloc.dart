@@ -87,14 +87,13 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   }
 
   Stream<TodoDetailsState> _mapToggleCompletedEventToState(ToggleCompletedEvent event) async* {
-    if (_item.completed) {
-      _item = _item.copyWith(completed: false, completedOn: null);
-      setAllNotificationsForItem(_item);
-    } else {
-      _item = _item.copyWith(completed: true, completedOn: DateTime.now());
-      cancelAllNotificationsForItem(_item);
-    }
+    _item = _item.toggleCompleted();
     yield TodoDetailsFullyLoaded(_item, _lists);
+    if (_item.completed) {
+      cancelAllNotificationsForItem(_item);
+    } else {
+      setAllNotificationsForItem(_item);
+    }
     _notifyList();
     _repository.updateTodoItem(_item);
   }
