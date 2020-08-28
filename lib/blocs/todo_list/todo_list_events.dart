@@ -30,13 +30,11 @@ class GetDataEvent extends TodoListEvent {
 }
 
 class NotifyItemUpdateEvent extends TodoListEvent {
-  final int index;
   final TodoItem item;
-  final List<TodoList> lists;
-  NotifyItemUpdateEvent(this.index, this.item, this.lists);
+  NotifyItemUpdateEvent(this.item);
 
   @override
-  List<Object> get props => [index, item];
+  List<Object> get props => [item];
 }
 
 class UpdateFilterEvent extends TodoListEvent {

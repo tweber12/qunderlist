@@ -6,23 +6,50 @@ import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/pigeon.dart';
 import 'package:qunderlist/repository/repository.dart';
 
+class RateLimit {
+  final Duration _gap;
+  final Function() _callback;
+
+  bool _timeout = false;
+  bool _requestDuringTimeout = false;
+
+  RateLimit(this._gap, this._callback);
+
+  void call() async {
+    if (_timeout) {
+      _requestDuringTimeout = true;
+      return;
+    }
+    _timeout = true;
+    _requestDuringTimeout = false;
+    _callback();
+    await Future.delayed(_gap);
+    _timeout = false;
+    if (_requestDuringTimeout) {
+      call();
+    }
+  }
+}
+
 class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,TodoDetailsState> {
   int _itemId;
   TodoItem _item;
   List<TodoList> _lists;
-  int _index;
   final TodoListBloc _listBloc;
   final R _repository;
   final Api api;
+  RateLimit notifier;
 
-  TodoDetailsBloc(R repository, int itemId, {TodoItem item, int index, TodoListBloc listBloc}):
+  TodoDetailsBloc(R repository, int itemId, {TodoItem item, TodoListBloc listBloc}):
         _repository=repository,
-        _index = index,
         _listBloc=listBloc,
         _item=item,
         _itemId = itemId,
         api = Api(),
-        super(item==null ? TodoDetailsLoading() : TodoDetailsLoadedItem(item));
+        super(item==null ? TodoDetailsLoading() : TodoDetailsLoadedItem(item))
+  {
+    notifier = _listBloc!=null ? RateLimit(Duration(seconds: 1), _notifyHelper) : null;
+  }
 
   @override
   Stream<TodoDetailsState> mapEventToState(TodoDetailsEvent event) async* {
@@ -175,16 +202,17 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   }
 
   Future<void> _notifyList() async {
-    if (_listBloc == null) {
-      return;
-    }
-    _listBloc.add(NotifyItemUpdateEvent(_index, _item, _lists));
+    notifier?.call();
+  }
+
+  void _notifyHelper() {
+    _listBloc.add(NotifyItemUpdateEvent(_item));
   }
 
   @override
   Future<void> close() {
     print("Close called");
-    _notifyList();
+    _notifyHelper();
     return super.close();
   }
 }

@@ -73,7 +73,7 @@ class TodoListItemDao {
   }
 
   Future<List<TodoItem>> getTodoItemsOfListChunk(int listId, int start, int end, TodoStatusFilter filter) async {
-    var results = await _queryFilteredListItems(listId, filter, orderBy: "$TODO_LIST_ITEMS_ORDERING");
+    var results = await _queryFilteredListItems(listId, filter, ordered: true);
     var reminderMap = await reminderDao.getRemindersForItems(results.map((m) => m[ID] as int).toList());
     var items = results.map((result) {
       var id = result[ID];
@@ -149,18 +149,18 @@ class TodoListItemDao {
       """, [listId]);
   }
 
-  Future<List<Map<String,dynamic>>> _queryFilteredListItems(int listId, TodoStatusFilter filter, {List<String> columns, String orderBy}) {
+  Future<List<Map<String,dynamic>>> _queryFilteredListItems(int listId, TodoStatusFilter filter, {List<String> columns, bool ordered=false}) {
     switch (filter) {
       case TodoStatusFilter.all:
-        return _queryListItems(listId, columns: columns, orderBy: orderBy);
+        return _queryListItems(listId, columns: columns, orderBy: TODO_LIST_ITEMS_ORDERING);
       case TodoStatusFilter.active:
-        return _queryListItems(listId, columns: columns, orderBy: orderBy, where: "$TODO_ITEM_COMPLETED_DATE isnull");
+        return _queryListItems(listId, columns: columns, orderBy: TODO_LIST_ITEMS_ORDERING, where: "$TODO_ITEM_COMPLETED_DATE isnull");
       case TodoStatusFilter.completed:
-        return _queryListItems(listId, columns: columns, orderBy: orderBy, where: "$TODO_ITEM_COMPLETED_DATE not null");
+        return _queryListItems(listId, columns: columns, orderBy: "$TODO_ITEM_COMPLETED_DATE desc, $TODO_LIST_ITEMS_ORDERING", where: "$TODO_ITEM_COMPLETED_DATE not null");
       case TodoStatusFilter.important:
-        return _queryListItems(listId, columns: columns, orderBy: orderBy, where: "$TODO_ITEM_COMPLETED_DATE isnull and $TODO_ITEM_PRIORITY = ?", whereArgs: [TodoPriority.high.index]);
+        return _queryListItems(listId, columns: columns, orderBy: "$TODO_ITEM_PRIORITY asc, $TODO_LIST_ITEMS_ORDERING", where: "$TODO_ITEM_COMPLETED_DATE isnull and $TODO_ITEM_PRIORITY != ?", whereArgs: [TodoPriority.none.index]);
       case TodoStatusFilter.withDueDate:
-        return _queryListItems(listId, columns: columns, orderBy: orderBy, where: "$TODO_ITEM_COMPLETED_DATE isnull and $TODO_ITEM_DUE_DATE not null");
+        return _queryListItems(listId, columns: columns, orderBy: TODO_ITEM_DUE_DATE, where: "$TODO_ITEM_COMPLETED_DATE isnull and $TODO_ITEM_DUE_DATE not null");
       default:
         throw "BUG: Unhandled status filter in query";
     }

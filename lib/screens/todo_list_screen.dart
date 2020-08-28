@@ -305,7 +305,6 @@ class TodoListItemCard extends StatelessWidget {
                 ctx,
                 RepositoryProvider.of<TodoRepository>(context),
                 initialItem: item,
-                index: index,
                 todoListBloc: BlocProvider.of<TodoListBloc>(context)
             )
         )

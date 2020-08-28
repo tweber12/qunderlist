@@ -7,7 +7,7 @@ import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
 
-Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc, int index}) {
+Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc}) {
   assert(itemId != null || initialItem != null);
   return RepositoryProvider.value(
       value: repository,
@@ -17,7 +17,6 @@ Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repo
               repository,
               itemId ?? initialItem.id,
               item: initialItem,
-              index: index,
               listBloc: todoListBloc
           );
           bloc.add(LoadItemEvent());
