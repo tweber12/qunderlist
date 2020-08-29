@@ -66,6 +66,15 @@ class TodoListDao {
     return todoListFromRepresentation(results.first);
   }
 
+  Future<TodoList> getTodoListByName(String name) async {
+    var results = await _db.query(TODO_LISTS_TABLE,
+        columns: [ID, TODO_LIST_NAME], where: "$TODO_LIST_NAME = ?", whereArgs: [name]);
+    if (results.isEmpty) {
+      return null;
+    }
+    return todoListFromRepresentation(results.first);
+  }
+
   Future<int> getNumberOfTodoLists() async {
     var results = await _db.query(TODO_LISTS_TABLE, columns: ["count(1)"]);
     return (firstIntValue(results) ?? 0);
@@ -77,6 +86,18 @@ class TodoListDao {
         orderBy: "$TODO_LIST_ORDERING asc",
         offset: start,
         limit: end - start);
+    return results.map((m) => todoListFromRepresentation(m)).toList();
+  }
+
+  Future<List<TodoList>> getMatchingLists(String pattern, int limit) async {
+    var results = await _db.query(
+      TODO_LISTS_TABLE,
+      columns: [ID, TODO_LIST_NAME],
+      where: "$TODO_LIST_NAME like ?",
+      whereArgs: ["%"+pattern+"%"],
+      orderBy: TODO_LIST_NAME,
+      limit: limit,
+    );
     return results.map((m) => todoListFromRepresentation(m)).toList();
   }
 

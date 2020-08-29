@@ -61,7 +61,13 @@ class TodoRepositorySqflite implements TodoRepository {
   Future<TodoList> getTodoList(int id) => listDao.getTodoList(id);
 
   @override
+  Future<TodoList> getTodoListByName(String name) => listDao.getTodoListByName(name);
+
+  @override
   Future<List<TodoList>> getTodoListsChunk(int start, int end) => listDao.getTodoListsChunk(start, end);
+
+  @override
+  Future<List<TodoList>> getMatchingLists(String pattern, {int limit=5}) => listDao.getMatchingLists(pattern, limit);
 
   @override
   Future<int> addTodoItem(TodoItem item, int listId) async {

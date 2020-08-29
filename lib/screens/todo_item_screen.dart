@@ -2,9 +2,9 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:qunderlist/blocs/todo_details.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
-import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/widgets/sliver_header.dart';
 
@@ -96,12 +96,12 @@ class TodoItemDetailsLists extends StatelessWidget {
         leading: Icon(Icons.playlist_add),
         title: Wrap(
           children: lists
-              .map((list) => TodoItemDetailsListChip(list,
+              .map((list) => TodoItemDetailsListChip(list, lists,
               canRemove: lists.length > 1))
               .toList(),
           spacing: 6,
         ),
-        onTap: () async => await addToList(context),
+        onTap: () async => await _addToList(context, lists),
       );
     }
   }
@@ -110,7 +110,8 @@ class TodoItemDetailsLists extends StatelessWidget {
 class TodoItemDetailsListChip extends StatelessWidget {
   final TodoList list;
   final bool canRemove;
-  TodoItemDetailsListChip(this.list, {this.canRemove = true});
+  final List<TodoList> lists;
+  TodoItemDetailsListChip(this.list, this.lists, {this.canRemove = true});
 
   @override
   Widget build(BuildContext context) {
@@ -130,117 +131,135 @@ class TodoItemDetailsListChip extends StatelessWidget {
             }
           : null,
       deleteIcon: Icon(Icons.cancel, color: Colors.white, size: 18),
-      onPressed: () async => await addToList(context, moveFromList: list),
+      onPressed: () async => await _addToList(context, lists, moveFromList: list),
       backgroundColor: Colors.blue,
     );
   }
 }
 
-Future<void> addToList(BuildContext context, {TodoList moveFromList}) async {
+Future<void> _addToList(BuildContext context, List<TodoList> onLists, {TodoList moveFromList}) async {
   var move = moveFromList != null;
-  AddToList add = await showDialog(context: context, child: TodoItemDetailsAddListDialog(RepositoryProvider.of<TodoRepository>(context), move: move));
-  if (add == null) {
-    return;
+
+  void _addToListInternal(TodoList list, bool copy) {
+    if (move) {
+      BlocProvider.of<TodoDetailsBloc>(context).add(MoveToListEvent(moveFromList.id, list));
+    } else if (copy) {
+      BlocProvider.of<TodoDetailsBloc>(context).add(CopyToListEvent(list.id));
+    } else {
+      BlocProvider.of<TodoDetailsBloc>(context).add(AddToListEvent(list));
+    }
   }
-  if (move) {
-    BlocProvider.of<TodoDetailsBloc>(context).add(MoveToListEvent(moveFromList.id, add.list));
-  } else if (add.copy) {
-    BlocProvider.of<TodoDetailsBloc>(context).add(CopyToListEvent(add.list.id));
-  } else {
-    BlocProvider.of<TodoDetailsBloc>(context).add(AddToListEvent(add.list));
-  }
+
+  return showDialog(
+      context: context,
+      child: _AddToListDialog(RepositoryProvider.of<TodoRepository>(context), _addToListInternal, onLists, move: move)
+  );
 }
 
-class TodoItemDetailsAddListDialog extends StatefulWidget {
-  final bool move;
+class _AddToListDialog extends StatefulWidget {
   final TodoRepository repository;
-  TodoItemDetailsAddListDialog(this.repository, {this.move = false});
+  final Function(TodoList list, bool copy) addToList;
+  final bool move;
+  final List<TodoList> onLists;
+
+  _AddToListDialog(this.repository, this.addToList, this.onLists, {this.move=false});
+
   @override
-  _TodoItemDetailsAddListDialogState createState() =>
-      _TodoItemDetailsAddListDialogState();
+  __AddToListDialogState createState() => __AddToListDialogState();
 }
 
-class _TodoItemDetailsAddListDialogState
-    extends State<TodoItemDetailsAddListDialog> {
-  TodoList selected;
-  bool createCopy;
+class __AddToListDialogState extends State<_AddToListDialog> {
+  TodoList _list;
+  bool _copy = false;
+  bool _alreadyOn = false;
+  List<int> _excludeLists;
+  final TextEditingController _typeAheadController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    createCopy = false;
+    _excludeLists = widget.onLists.map((l) => l.id).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    var verb = (_copy || _alreadyOn) ? "Copy" : widget.move ? "Move" : "Add";
     return AlertDialog(
-      title: Text("Add item to list"),
-      content: BlocProvider<TodoListsBloc>(
-        create: (context) {
-          var bloc = TodoListsBloc(widget.repository);
-          bloc.add(LoadTodoListsEvent());
-          return bloc;
-        },
-        child: Column(
-          children: <Widget>[
-            ListSelector(selectList, initial: this.selected),
-            if(!widget.move)
-              CheckboxListTile(
-                  controlAffinity: ListTileControlAffinity.leading,
-                  value: createCopy,
-                  title: Text("Create a copy of the item"),
-                  onChanged: (value) => setCopy(value)
-              ),
-          ],
-          mainAxisSize: MainAxisSize.min,
-        ),
+      title: Text("$verb item to list"),
+      content: Column(
+        children: [
+          _listSelector(context, widget.repository),
+          if (!widget.move) _copyCheckbox(context),
+        ],
+        mainAxisSize: MainAxisSize.min,
       ),
-      actions: <Widget>[
-        FlatButton(child: Text("Cancel"), onPressed: () => Navigator.pop(context,null),),
-        RaisedButton(child: Text(widget.move ? "Move" : "Add"), onPressed: () => Navigator.pop(context,AddToList(selected,createCopy))),
+      actions: [
+        FlatButton(child: Text("Cancel"), onPressed: () => Navigator.pop(context)),
+        RaisedButton(
+            child: Text(verb),
+            onPressed: _list!=null ? () {
+              widget.addToList(_list, _copy);
+              Navigator.pop(context);
+            } : null
+        )
       ],
     );
   }
 
-  void selectList(TodoList list) {
-    setState(() {
-      selected = list;
-    });
-  }
-  void setCopy(bool copy) {
-    setState(() {
-      createCopy = copy;
-    });
-  }
-}
-class AddToList {
-  final TodoList list;
-  final bool copy;
-
-  AddToList(this.list, this.copy);
-}
-
-class ListSelector extends StatelessWidget {
-  final Function(TodoList) callback;
-  final TodoList initial;
-  ListSelector(this.callback, {this.initial});
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<TodoListsBloc,TodoListsStates>(
-      builder: (context, state) {
-        if (state is TodoListsLoading) {
-          return CircularProgressIndicator();
-        }
-        var cache = (state as TodoListsLoaded).lists;
-        var lists = [for (int i=0; i<min(cache.totalNumberOfItems, 10); i++) cache[i]];
-        return DropdownButton(
-          value: initial,
-          items: lists.map((list) => DropdownMenuItem(value: list, child: Text(list.listName),)).toList(),
-          onChanged: (value) { callback(value); },
-        );
-      },
+  Widget _listSelector(BuildContext context, TodoRepository repository) {
+    return TypeAheadField<TodoList>(
+        itemBuilder: (context, list) => ListTile(title: Text(list.listName)),
+        suggestionsCallback: _getSuggestion,
+        onSuggestionSelected: (list) => _selectList(list),
+        transitionBuilder: (context, suggestionsBox, controller) {
+          return suggestionsBox;
+        },
+        textFieldConfiguration: TextFieldConfiguration(
+            autofocus: true,
+            controller: _typeAheadController,
+            decoration: InputDecoration(labelText: "List Name"),
+            onChanged: (name) => _lookupList(name)
+            ),
     );
+  }
+
+  Widget _copyCheckbox(BuildContext context) {
+    return CheckboxListTile(
+        controlAffinity: ListTileControlAffinity.leading,
+        value: _alreadyOn || _copy,
+        title: Text("Create a copy of the item"),
+        onChanged: _alreadyOn ? null : (value) => _setCopy(value),
+    );
+  }
+
+  Future<Iterable<TodoList>> _getSuggestion(String pattern) async {
+    return widget.repository.getMatchingLists(pattern, limit: 4);
+  }
+
+  void _setCopy(bool value) {
+    setState(() {
+      _copy = value;
+    });
+  }
+  void _lookupList(String name) async {
+    var list = await widget.repository.getTodoListByName(name);
+    if (list != null) {
+      _selectList(list);
+    } else {
+      setState(() {
+        _list = null;
+        _alreadyOn = false;
+      });
+    }
+  }
+  void _selectList(TodoList list) {
+    setState(() {
+      if (_typeAheadController.text != list.listName) {
+        _typeAheadController.text = list.listName;
+      }
+      _list = list;
+      _alreadyOn = _excludeLists.contains(_list.id);
+    });
   }
 }
 
