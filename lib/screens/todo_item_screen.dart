@@ -6,6 +6,7 @@ import 'package:qunderlist/blocs/todo_details.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
+import 'package:qunderlist/widgets/sliver_header.dart';
 
 Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc}) {
   assert(itemId != null || initialItem != null);
@@ -43,22 +44,14 @@ class TodoItemDetailScreen extends StatelessWidget {
         } else if (state is TodoDetailsFullyLoaded) {
           item = state.item;
         }
-        print("REBUILDING MAIN");
         return Scaffold(
             body: CustomScrollView(
               slivers: <Widget>[
-                SliverAppBar(
-                  actions: <Widget>[
-                    InfoButton(item),
-                    ExtraActionsButton(item)
-                  ],
-                  expandedHeight: 140,
-                  flexibleSpace: FlexibleSpaceBar(
-                    title: ShowTitle(item),
-                    titlePadding: EdgeInsets.symmetric(
-                        horizontal: 40, vertical: 18),
-                  ),
-                  pinned: true,
+                SliverHeader(
+                  item.todo,
+                  dialogTitle: "Rename Task",
+                  onTitleChange: (title) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateTitleEvent(title)),
+                  actions: [InfoButton(item), ExtraActionsButton(item)],
                 ),
                 SliverList(
                     delegate: SliverChildListDelegate([
@@ -470,75 +463,6 @@ class _TodoItemDetailsNotesDialogState extends State<TodoItemDetailsNotesDialog>
       actions: <Widget>[
         FlatButton(child: Text("Cancel"), onPressed: () => Navigator.pop(context, null),),
         RaisedButton(child: Text("Set note"), onPressed: () => Navigator.pop(context, controller.text),),
-      ],
-    );
-  }
-}
-
-
-class ShowTitle extends StatelessWidget {
-  final TodoItem item;
-  ShowTitle(this.item);
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-        width: 1000000,
-        child: InkWell(
-          child: Text(
-            item.todo,
-            style: TextStyle(fontSize: 24),
-          ),
-          onTap: () async {
-            var newTitle = await showDialog(
-              context: context,
-              child: TitleUpdateDialog(item.todo),
-            );
-            BlocProvider.of<TodoDetailsBloc>(context)
-                .add(UpdateTitleEvent(newTitle));
-          },
-        ));
-  }
-}
-
-class TitleUpdateDialog extends StatefulWidget {
-  final String oldTitle;
-  TitleUpdateDialog(this.oldTitle);
-
-  @override
-  State<StatefulWidget> createState() {
-    return _TitleUpdateDialogState();
-  }
-}
-
-class _TitleUpdateDialogState extends State<TitleUpdateDialog> {
-  TextEditingController todoController;
-
-  @override
-  void initState() {
-    super.initState();
-    todoController = TextEditingController(text: widget.oldTitle);
-    todoController.addListener(() {
-      setState(() {});
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    var text = todoController.text.trim();
-    return AlertDialog(
-      title: Text("Rename Todo Item"),
-      content: TextField(controller: todoController, autofocus: true),
-      actions: <Widget>[
-        FlatButton(
-          child: Text("Cancel"),
-          onPressed: () => Navigator.pop(context, null),
-        ),
-        RaisedButton(
-          child: Text("Set"),
-          onPressed:
-              text.isNotEmpty ? () => Navigator.pop(context, text) : null,
-        )
       ],
     );
   }
