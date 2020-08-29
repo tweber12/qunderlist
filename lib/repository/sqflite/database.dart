@@ -5,6 +5,7 @@ const String ID = "id";
 
 const String TODO_LISTS_TABLE = "todo_lists";
 const String TODO_LIST_NAME = "list_name";
+const String TODO_LIST_COLOR = "list_color";
 const String TODO_LIST_ORDERING = "list_ordering";
 
 const String TODO_ITEMS_TABLE = "todo_items";
@@ -13,6 +14,7 @@ const String TODO_ITEM_COMPLETED = "item_complete";
 const String TODO_ITEM_PRIORITY = "item_priority";
 const String TODO_ITEM_NOTE = "item_note";
 const String TODO_ITEM_DUE_DATE = "item_due";
+const String TODO_ITEM_REPEAT = "item_repeat";
 const String TODO_ITEM_CREATED_DATE = "item_created_date";
 const String TODO_ITEM_COMPLETED_DATE = "item_completed_date";
 
@@ -24,6 +26,7 @@ const String TODO_LIST_ITEMS_ORDERING = "list_items_ordering";
 const String TODO_REMINDERS_TABLE = "todo_reminders";
 const String TODO_REMINDER_ITEM = "reminder_item";
 const String TODO_REMINDER_TIME = "reminder_time";
+const String TODO_REMINDER_REPEAT = "reminder_repeat";
 
 const String TODO_LIST_ITEMS_ORDERING_INDEX = "todo_list_items_ordering_index";
 const String TODO_REMINDER_INDEX = "todo_reminder_index";
@@ -36,6 +39,7 @@ Future<void> createDatabase(Database db, int version) async {
       create table $TODO_LISTS_TABLE (
         $ID integer primary key,
         $TODO_LIST_NAME text,
+        $TODO_LIST_COLOR tinyint,
         $TODO_LIST_ORDERING integer unique
       );
     """);
@@ -47,6 +51,7 @@ Future<void> createDatabase(Database db, int version) async {
         $TODO_ITEM_PRIORITY tinyint,
         $TODO_ITEM_NOTE text,
         $TODO_ITEM_DUE_DATE text,
+        $TODO_ITEM_REPEAT text,
         $TODO_ITEM_CREATED_DATE text,
         $TODO_ITEM_COMPLETED_DATE text
       );
@@ -79,7 +84,8 @@ Future<void> createDatabase(Database db, int version) async {
       create table $TODO_REMINDERS_TABLE (
         $ID integer primary key,
         $TODO_REMINDER_ITEM integer references $TODO_ITEMS_TABLE ($ID) on update cascade on delete cascade,
-        $TODO_REMINDER_TIME text
+        $TODO_REMINDER_TIME text,
+        $TODO_REMINDER_REPEAT text
       );
      """);
     txn.execute("""
