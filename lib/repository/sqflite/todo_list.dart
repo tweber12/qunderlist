@@ -59,7 +59,7 @@ class TodoListDao {
 
   Future<TodoList> getTodoList(int id) async {
     var results = await _db.query(TODO_LISTS_TABLE,
-        columns: [ID, TODO_LIST_NAME], where: "$ID = ?", whereArgs: [id]);
+        columns: [ID, TODO_LIST_NAME, TODO_LIST_COLOR], where: "$ID = ?", whereArgs: [id]);
     if (results.isEmpty) {
       return null;
     }
@@ -68,7 +68,7 @@ class TodoListDao {
 
   Future<TodoList> getTodoListByName(String name) async {
     var results = await _db.query(TODO_LISTS_TABLE,
-        columns: [ID, TODO_LIST_NAME], where: "$TODO_LIST_NAME = ?", whereArgs: [name]);
+        columns: [ID, TODO_LIST_NAME, TODO_LIST_COLOR], where: "$TODO_LIST_NAME = ?", whereArgs: [name]);
     if (results.isEmpty) {
       return null;
     }
@@ -82,7 +82,7 @@ class TodoListDao {
 
   Future<List<TodoList>> getTodoListsChunk(int start, int end) async {
     var results = await _db.query(
-        TODO_LISTS_TABLE, columns: [ID, TODO_LIST_NAME, TODO_LIST_ORDERING],
+        TODO_LISTS_TABLE, columns: [ID, TODO_LIST_NAME, TODO_LIST_COLOR],
         orderBy: "$TODO_LIST_ORDERING asc",
         offset: start,
         limit: end - start);

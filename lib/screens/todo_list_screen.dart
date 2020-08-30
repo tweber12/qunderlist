@@ -5,6 +5,7 @@ import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
+import 'package:qunderlist/theme.dart';
 
 Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, R repository, TodoList initialList) {
   TodoStatusFilter initialFilter = TodoStatusFilter.active;
@@ -16,7 +17,10 @@ Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, R repo
         bloc.add(GetDataEvent(filter: initialFilter));
         return bloc;
       },
-      child: TodoListScreen(initialFilter),
+      child: Theme(
+          child: TodoListScreen(initialFilter),
+          data: themeFromPalette(initialList.color),
+      ),
     )
   );
 }
@@ -202,7 +206,7 @@ class TodoListItemList extends StatelessWidget {
           reorderCallback: reorderable ? (from, to) => bloc.add(ReorderItemsEvent(from, to)) : null,
           itemHeight: 55
       ),
-      color: Colors.blue.shade100,
+      color: Theme.of(context).backgroundColor,
       padding: EdgeInsets.symmetric(horizontal: 8),
     );
   }

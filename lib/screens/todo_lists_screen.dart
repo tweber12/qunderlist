@@ -5,6 +5,7 @@ import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/screens/todo_list_screen.dart';
+import 'package:qunderlist/theme.dart';
 
 class TodoListsScreen extends StatelessWidget {
   @override
@@ -109,24 +110,26 @@ class TodoListAdder extends StatefulWidget {
 }
 class _TodoListAdderState extends State<TodoListAdder> {
   var titleController = TextEditingController();
+  Palette palette;
   @override
   void initState() {
     super.initState();
     titleController.addListener(() { setState(() {});});
+    palette = Palette.blue;
   }
 
   @override
   Widget build(BuildContext context) {
     var title = titleController.text.trim();
     print(title);
-    // TODO Figure out what to do with the chunk size
-    var action = () {widget.bloc.add(TodoListAddedEvent(TodoList(title))); Navigator.pop(context, true);};
+    var action = () {widget.bloc.add(TodoListAddedEvent(TodoList(title, palette))); Navigator.pop(context, true);};
     return Container(
       child: Column(
         children: <Widget>[
           ListTile(
               title: TextField(controller: titleController, autofocus: true, decoration: InputDecoration(labelText: "List title"),)
           ),
+          ThemePicker(_setPalette, defaultPalette: Palette.blue,),
           Row(
             children: <Widget>[
               RaisedButton(child: Text("Create List"), onPressed: title.isEmpty ? null : action),
@@ -138,5 +141,11 @@ class _TodoListAdderState extends State<TodoListAdder> {
       ),
       padding: EdgeInsets.fromLTRB(10, 3, 10, MediaQuery.of(context).viewInsets.bottom+9),
     );
+  }
+
+  void _setPalette(Palette palette) {
+    setState(() {
+      this.palette = palette;
+    });
   }
 }

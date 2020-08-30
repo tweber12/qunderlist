@@ -101,6 +101,7 @@ Future<void> configureDatabase(Database db) {
 TodoList todoListFromRepresentation(Map<String, dynamic> representation) {
   return TodoList(
     representation[TODO_LIST_NAME],
+    Palette.values[representation[TODO_LIST_COLOR]],
     id: representation[ID],
   );
 }
@@ -108,6 +109,7 @@ TodoList todoListFromRepresentation(Map<String, dynamic> representation) {
 Map<String, dynamic> todoListToRepresentation(TodoList list, {int ordering}) {
   Map<String,dynamic> map = {
     TODO_LIST_NAME: list.listName,
+    TODO_LIST_COLOR: list.color.index,
   };
   if (ordering != null) {
     map[TODO_LIST_ORDERING] = ordering;

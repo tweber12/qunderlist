@@ -15,6 +15,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   TodoListOrdering ordering;
 
   int get listId => _list.id;
+  Palette get color => _list.color;
 
   int findItemIndex(int itemId) {
     return cache.findItem((item) => item.id == itemId);
@@ -48,7 +49,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   }
 
   Stream<TodoListStates> _mapRenameListEventToState(RenameListEvent event) async* {
-    await _repository.updateTodoList(TodoList(event.name, id: _list.id));
+    await _repository.updateTodoList(TodoList(event.name, _list.color, id: _list.id));
     yield TodoListLoaded(_list, cache);
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {

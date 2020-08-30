@@ -6,6 +6,7 @@ import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:qunderlist/blocs/todo_details.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/repository/repository.dart';
+import 'package:qunderlist/theme.dart';
 import 'package:qunderlist/widgets/sliver_header.dart';
 
 Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc}) {
@@ -23,7 +24,10 @@ Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repo
           bloc.add(LoadItemEvent());
           return bloc;
         },
-        child: TodoItemDetailScreen(),
+        child: Theme(
+            child: TodoItemDetailScreen(),
+            data: themeFromPalette(todoListBloc?.color ?? Palette.blue),
+        ),
       )
   );
 }
@@ -115,8 +119,9 @@ class TodoItemDetailsListChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    var theme = Theme.of(context);
     return InputChip(
-      label: Text(list.listName, style: TextStyle(color: Colors.white)),
+      label: Text(list.listName, style: TextStyle(color: theme.primaryTextTheme.headline6.color)),
       onDeleted: canRemove
           ? () {
               var bloc = BlocProvider.of<TodoDetailsBloc>(context);
@@ -130,9 +135,9 @@ class TodoItemDetailsListChip extends StatelessWidget {
               ));
             }
           : null,
-      deleteIcon: Icon(Icons.cancel, color: Colors.white, size: 18),
+      deleteIcon: Icon(Icons.cancel, color: theme.primaryTextTheme.headline6.color, size: 18),
       onPressed: () async => await _addToList(context, lists, moveFromList: list),
-      backgroundColor: Colors.blue,
+      backgroundColor: theme.primaryColor,
     );
   }
 }

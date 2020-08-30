@@ -85,7 +85,7 @@ class TodoListItemDao {
 
   Future<List<TodoList>> getListsOfItem(int itemId) async {
     var results = await _db.rawQuery("""
-          select $ID, $TODO_LIST_NAME
+          select $ID, $TODO_LIST_NAME, $TODO_LIST_COLOR
             from $TODO_LISTS_TABLE
                  join $TODO_LIST_ITEMS_TABLE
                  on $ID = $TODO_LIST_ITEMS_LIST

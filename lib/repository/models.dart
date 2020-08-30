@@ -62,18 +62,41 @@ enum TodoListOrderingDirection {
   descending,
 }
 
+enum Palette {
+  pink,
+  red,
+  deepOrange,
+  orange,
+  amber,
+  yellow,
+  lime,
+  lightGreen,
+  green,
+  teal,
+  cyan,
+  lightBlue,
+  blue,
+  indigo,
+  purple,
+  deepPurple,
+  blueGrey,
+  brown,
+  grey,
+}
+
 class TodoList with EquatableMixin {
   final int id;
   final String listName;
+  final Palette color;
 
-  TodoList(this.listName, {this.id});
+  TodoList(this.listName, this.color, {this.id});
 
   @override
-  List<Object> get props => [id, listName];
+  List<Object> get props => [id, color, listName];
 
   TodoList withId(int id) {
     assert(this.id == null);
-    return TodoList(listName, id: id);
+    return TodoList(listName, color, id: id);
   }
 }
 
