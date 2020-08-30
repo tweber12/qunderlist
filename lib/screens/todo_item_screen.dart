@@ -7,6 +7,7 @@ import 'package:qunderlist/blocs/todo_details.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/theme.dart';
+import 'package:qunderlist/widgets/priority.dart';
 import 'package:qunderlist/widgets/sliver_header.dart';
 
 Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc}) {
@@ -64,7 +65,7 @@ class TodoItemDetailScreen extends StatelessWidget {
                         height: 8,
                       ),
                       TodoItemDetailsCompleted(item.completed),
-                      TodoItemDetailsPriority(item.priority),
+                      PriorityTile(item.priority, (priority) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdatePriorityEvent(priority))),
                       Divider(),
                       TodoItemDetailsDueDate(item.dueDate),
                       TodoItemDetailsReminders(item.reminders),
@@ -281,23 +282,6 @@ class TodoItemDetailsCompleted extends StatelessWidget {
       title: Text(completed ? "completed" : "active"),
       onTap: () =>
           BlocProvider.of<TodoDetailsBloc>(context).add(ToggleCompletedEvent()),
-    );
-  }
-}
-
-class TodoItemDetailsPriority extends StatelessWidget {
-  final TodoPriority priority;
-  TodoItemDetailsPriority(this.priority);
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(Icons.bookmark_border, color: bgColorForPriority(priority)),
-      title: Text("${nameForPriority(priority)} priority"),
-      onTap: () => BlocProvider.of<TodoDetailsBloc>(context).add(
-          UpdatePriorityEvent(priority == TodoPriority.none
-              ? TodoPriority.high
-              : TodoPriority.none)),
     );
   }
 }
@@ -558,99 +542,6 @@ class ExtraActionsButton extends StatelessWidget {
         }
       },
     );
-  }
-}
-
-Widget priorityIcon(TodoPriority priority) {
-  return Ink(
-    decoration: ShapeDecoration(
-      color: bgColorForPriority(priority),
-      shape: CircleBorder(),
-    ),
-    width: 50,
-    child: Padding(
-      child: Icon(Icons.bookmark_border,
-          size: 24, color: priority == TodoPriority.none ? null : Colors.white),
-      padding: EdgeInsets.all(14),
-    ),
-  );
-}
-
-class PriorityButton extends StatelessWidget {
-  final TodoPriority priority;
-  final Function(TodoPriority newPriority) callback;
-
-  PriorityButton(this.priority, this.callback);
-
-  @override
-  Widget build(BuildContext context) {
-    // TODO: implement build
-    return Ink(
-        decoration: ShapeDecoration(
-          color: bgColorForPriority(priority),
-          shape: CircleBorder(),
-        ),
-        child: InkWell(
-            child: Padding(
-              child: Icon(Icons.bookmark_border,
-                  size: 24,
-                  color: priority == TodoPriority.none ? null : Colors.white),
-              padding: EdgeInsets.all(14),
-            ),
-            onTap: () {
-              var newPriority = priority == TodoPriority.none
-                  ? TodoPriority.high
-                  : TodoPriority.none;
-              callback(newPriority);
-            },
-            onLongPress: () async {
-              var newPriority = await showMenu<TodoPriority>(
-                  context: context,
-                  position: RelativeRect.fromLTRB(10, 85, 0, 0),
-                  items: [
-                    for (var prio in [
-                      TodoPriority.high,
-                      TodoPriority.medium,
-                      TodoPriority.low,
-                      TodoPriority.none
-                    ])
-                      PopupMenuItem(
-                          child: Center(child: priorityIcon(prio)),
-                          value: prio,
-                          height: 50)
-                  ]);
-              callback(newPriority);
-            }));
-  }
-}
-
-String nameForPriority(TodoPriority priority) {
-  switch (priority) {
-    case TodoPriority.high:
-      return "high";
-    case TodoPriority.medium:
-      return "medium";
-    case TodoPriority.low:
-      return "low";
-    case TodoPriority.none:
-      return "no";
-    default:
-      throw "BUG: Unhandled priority when assigning names!";
-  }
-}
-
-Color bgColorForPriority(TodoPriority priority) {
-  switch (priority) {
-    case TodoPriority.high:
-      return Colors.red;
-    case TodoPriority.medium:
-      return Colors.lightBlueAccent;
-    case TodoPriority.low:
-      return Colors.lightGreenAccent;
-    case TodoPriority.none:
-      return null;
-    default:
-      throw "BUG: Unhandled priority when assigning colors!";
   }
 }
 
