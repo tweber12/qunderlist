@@ -7,6 +7,7 @@ import 'package:qunderlist/blocs/todo_details.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/theme.dart';
+import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
 import 'package:qunderlist/widgets/sliver_header.dart';
 
@@ -67,8 +68,16 @@ class TodoItemDetailScreen extends StatelessWidget {
                       TodoItemDetailsCompleted(item.completed),
                       PriorityTile(item.priority, (priority) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdatePriorityEvent(priority))),
                       Divider(),
-                      TodoItemDetailsDueDate(item.dueDate),
-                      TodoItemDetailsReminders(item.reminders),
+                      DueDateTile((date) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateDueDateEvent(date)), initialDate: item.dueDate),
+                      ReminderTile(
+                        item.reminders,
+                        (date) => BlocProvider.of<TodoDetailsBloc>(context).add(AddReminderEvent(Reminder(date))),
+                        (reminder) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateReminderEvent(reminder)),
+                        (reminder) => BlocProvider.of<TodoDetailsBloc>(context).add(DeleteReminderEvent(reminder)),
+                        allowUndo: true,
+                        startDate: item.dueDate,
+                      ),
+//                      TodoItemDetailsReminders(item.reminders),
                       Divider(),
                       TodoItemDetailsNotes(item.note),
                     ])
@@ -286,126 +295,6 @@ class TodoItemDetailsCompleted extends StatelessWidget {
   }
 }
 
-class TodoItemDetailsDueDate extends StatelessWidget {
-  final DateTime dueDate;
-  TodoItemDetailsDueDate(this.dueDate);
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(Icons.calendar_today),
-      title:
-          Text(dueDate == null ? "no due date" : "due ${formatDate(dueDate)}"),
-      trailing: dueDate == null ? null : IconButton(icon: Icon(Icons.cancel), onPressed: () {BlocProvider.of<TodoDetailsBloc>(context).add(UpdateDueDateEvent(null));},),
-      onTap: () async {
-        var now = DateTime.now();
-        var date = await showDatePicker(
-            context: context,
-            initialDate: now,
-            firstDate: now,
-            lastDate: DateTime(now.year + 10));
-        if (date == null) {
-          return;
-        }
-        BlocProvider.of<TodoDetailsBloc>(context).add(UpdateDueDateEvent(date));
-      },
-    );
-  }
-}
-
-class TodoItemDetailsReminders extends StatelessWidget {
-  final List<Reminder> reminders;
-  TodoItemDetailsReminders(this.reminders);
-
-  @override
-  Widget build(BuildContext context) {
-    if (reminders.isEmpty) {
-      return ListTile(
-        leading: Icon(Icons.alarm_add),
-        title: Text("no reminders"),
-        onTap: () => addReminder(context),
-      );
-    } else {
-      reminders.sort((a, b) => a.at.compareTo(b.at));
-      return ListTile(
-          leading: Icon(Icons.alarm_add),
-          title: Wrap(
-            children: <Widget>[
-              for (var index = 0; index < reminders.length; index++)
-                TodoItemDetailsReminderChip(reminders, index)
-            ],
-            spacing: 6,
-          ),
-          onTap: () => addReminder(context));
-    }
-  }
-
-  Future<void> addReminder(BuildContext context) async {
-    var newReminder = await showDateTimeDialog(context);
-    BlocProvider.of<TodoDetailsBloc>(context)
-        .add(AddReminderEvent(Reminder(newReminder)));
-  }
-}
-
-class TodoItemDetailsReminderChip extends StatelessWidget {
-  final List<Reminder> reminders;
-  final int index;
-  TodoItemDetailsReminderChip(this.reminders, this.index);
-
-  @override
-  Widget build(BuildContext context) {
-    var reminder = reminders[index];
-    return InputChip(
-      label: Text(
-          "${formatDate(reminder.at)}, ${reminder.at.hour}:${reminder.at.minute.toString().padLeft(2, "0")}"),
-      onDeleted: () {
-        var bloc = BlocProvider.of<TodoDetailsBloc>(context);
-        bloc.add(DeleteReminderEvent(reminder));
-        Scaffold.of(context).showSnackBar(SnackBar(
-          content: Text("Reminder deleted"),
-          action: SnackBarAction(
-            label: "Undo",
-            onPressed: () {
-              reminders.add(reminder);
-              bloc.add(AddReminderEvent(reminder));
-            },
-          ),
-        ));
-      },
-      onPressed: () async {
-        var newReminder = await showDateTimeDialog(context, initial: reminder.at);
-        if (newReminder != reminder.at) {
-          BlocProvider.of<TodoDetailsBloc>(context)
-              .add(UpdateReminderEvent(reminder.copyWith(at: newReminder)));
-        }
-      },
-    );
-  }
-}
-
-Future<DateTime> showDateTimeDialog(BuildContext context, {DateTime initial}) async {
-  var now = DateTime.now();
-  var initialDate = initial ?? now;
-  var initialTime = TimeOfDay(hour: initialDate.hour, minute: initialDate.minute);
-  var date = await showDatePicker(
-    context: context,
-    initialDate: initialDate,
-    firstDate: now,
-    lastDate: DateTime(now.year + 10),
-  );
-  if (date == null) {
-    return null;
-  }
-  var time = await showTimePicker(
-    context: context,
-    initialTime: initialTime,
-  );
-  if (time == null) {
-    return null;
-  }
-  return DateTime(date.year, date.month, date.day, time.hour, time.minute);
-}
-
 class TodoItemDetailsNotes extends StatelessWidget {
   final String note;
   final bool hasNote;
@@ -558,196 +447,65 @@ class TodoItemAdder extends StatefulWidget {
 class _TodoItemAdderState extends State<TodoItemAdder> {
   var nameController = TextEditingController();
   DateTime dueDate;
+  int reminderId = 0;
+  List<Reminder> reminders = [];
+  TodoPriority priority = TodoPriority.none;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
         ListTile(
+          leading: Icon(Icons.title),
             title: TextField(
-          controller: nameController,
-          decoration: InputDecoration(labelText: "Todo"),
-          autofocus: true,
-        )),
-        DueDateButton(dueDate, (date) {
-          setState(() {
-            dueDate = date;
-          });
-        }),
+              controller: nameController,
+              decoration: InputDecoration(labelText: "Todo"),
+              autofocus: true,
+            ),
+          trailing: PriorityButton(priority, _setPriority),
+        ),
+        DueDateTile(_setDueDate),
+        ReminderTile(reminders, _addReminder, _updateReminder, _deleteReminder, startDate: dueDate),
         ButtonBar(children: [
           RaisedButton(
               child: Text("Add"),
               onPressed: () {
                 widget.bloc.add(AddItemEvent(TodoItem(
-                    nameController.text, DateTime.now(),
-                    dueDate: dueDate)));
+                    nameController.text, DateTime.now(), priority: priority,
+                    dueDate: dueDate, reminders: reminders.map((r) => Reminder(r.at)).toList())));
                 Navigator.pop(context);
               })
         ]),
       ],
     );
   }
-}
 
-enum DateSelection {
-  today,
-  tomorrow,
-  nextWeek,
-  other,
-}
-
-class DueDateButton extends StatelessWidget {
-  final DateTime dueDate;
-  final Function(DateTime) callback;
-  DueDateButton(this.dueDate, this.callback);
-
-  @override
-  Widget build(BuildContext context) {
-    Widget child = ListTile(
-      leading: Icon(Icons.date_range),
-      title:
-          Text(dueDate == null ? "Add due date" : "Due ${formatDate(dueDate)}"),
-      trailing: dueDate != null ? IconButton(icon: Icon(Icons.delete)) : null,
-    );
-    var button = PopupMenuButton<DateSelection>(
-      itemBuilder: (context) => [
-        PopupMenuItem<DateSelection>(
-            value: DateSelection.today, child: Text("Today")),
-        PopupMenuItem<DateSelection>(
-            value: DateSelection.tomorrow, child: Text("Tomorrow")),
-        PopupMenuItem<DateSelection>(
-            value: DateSelection.nextWeek, child: Text("Next week")),
-        PopupMenuItem<DateSelection>(
-            value: DateSelection.other, child: Text("Custom date")),
-      ],
-      onSelected: (DateSelection result) async {
-        var now = DateTime.now();
-        var today = DateTime(now.year, now.month, now.day);
-        switch (result) {
-          case DateSelection.today:
-            callback(today);
-            break;
-          case DateSelection.tomorrow:
-            callback(today.add(Duration(days: 1)));
-            break;
-          case DateSelection.nextWeek:
-            callback(today.add(Duration(days: DateTime.daysPerWeek)));
-            break;
-          case DateSelection.other:
-            var last = DateTime(today.year + 5);
-            var date = await showDatePicker(
-                context: context,
-                initialDate: today,
-                firstDate: today,
-                lastDate: last);
-            if (date != null) {
-              callback(date);
-            }
-            break;
-        }
-      },
-      child:
-          Text(dueDate == null ? "Set due date" : "Due ${formatDate(dueDate)}"),
-    );
-    return ListTile(
-      leading: Icon(Icons.calendar_today),
-      title: button,
-      trailing: dueDate != null
-          ? IconButton(
-              icon: Icon(Icons.delete),
-              onPressed: () => callback(null),
-            )
-          : null,
-    );
+  void _setPriority(TodoPriority priority) {
+    setState(() {
+      this.priority = priority;
+    });
   }
-}
-
-String formatDate(DateTime date) {
-  var now = DateTime.now();
-  var today = DateTime(now.year, now.month, now.day);
-  var distance = DateTime(date.year, date.month, date.day).difference(today);
-  if (distance.isNegative) {
-    if (distance.inHours > -12) {
-      return "Today";
-    } else if (distance.inHours > -36) {
-      return "Yesterday";
-    } else {
-      return formatFullDate(date, date.year == today.year);
-    }
-  } else {
-    if (distance.inHours < 12) {
-      return "Today";
-    } else if (distance.inHours < 36) {
-      return "Tomorrow";
-    } else {
-      return formatFullDate(date, date.year != today.year);
-    }
+  void _setDueDate(DateTime date) {
+    setState(() {
+      dueDate = date;
+    });
   }
-}
-
-String formatFullDate(DateTime date, bool showYear) {
-  var weekday;
-  switch (date.weekday) {
-    case DateTime.monday:
-      weekday = "Mo";
-      break;
-    case DateTime.tuesday:
-      weekday = "Tu";
-      break;
-    case DateTime.wednesday:
-      weekday = "We";
-      break;
-    case DateTime.thursday:
-      weekday = "Th";
-      break;
-    case DateTime.friday:
-      weekday = "Fr";
-      break;
-    case DateTime.saturday:
-      weekday = "Sa";
-      break;
-    case DateTime.sunday:
-      weekday = "Su";
-      break;
+  void _addReminder(DateTime at) {
+    setState(() {
+      reminders.add(Reminder(at, id: reminderId));
+      reminderId += 1;
+      reminders.sort((a,b) => a.at.compareTo(b.at));
+    });
   }
-  var month;
-  switch (date.month) {
-    case DateTime.january:
-      month = "Jan";
-      break;
-    case DateTime.february:
-      month = "Feb";
-      break;
-    case DateTime.march:
-      month = "Mar";
-      break;
-    case DateTime.april:
-      month = "Apr";
-      break;
-    case DateTime.may:
-      month = "May";
-      break;
-    case DateTime.june:
-      month = "Jun";
-      break;
-    case DateTime.july:
-      month = "Jul";
-      break;
-    case DateTime.august:
-      month = "Aug";
-      break;
-    case DateTime.september:
-      month = "Sep";
-      break;
-    case DateTime.october:
-      month = "Oct";
-      break;
-    case DateTime.november:
-      month = "Nov";
-      break;
-    case DateTime.december:
-      month = "Dec";
-      break;
+  void _updateReminder(Reminder updated) {
+    setState(() {
+      reminders = reminders.map((r) {return r.id == updated.id ? updated : r;}).toList();
+      reminders.sort((a,b) => a.at.compareTo(b.at));
+    });
   }
-  return "$weekday, ${date.day} $month${showYear ? " ${date.year}" : ""}";
+  void _deleteReminder(Reminder deleted) {
+    setState(() {
+      reminders = reminders.where((r) => r.id != deleted.id).toList();
+    });
+  }
 }

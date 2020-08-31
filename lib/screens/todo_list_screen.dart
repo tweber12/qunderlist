@@ -6,6 +6,7 @@ import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
 import 'package:qunderlist/theme.dart';
+import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
 
 Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, R repository, TodoList initialList) {
