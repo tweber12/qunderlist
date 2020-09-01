@@ -92,7 +92,7 @@ class TodoListDao {
   Future<List<TodoList>> getMatchingLists(String pattern, int limit) async {
     var results = await _db.query(
       TODO_LISTS_TABLE,
-      columns: [ID, TODO_LIST_NAME],
+      columns: [ID, TODO_LIST_NAME, TODO_LIST_COLOR],
       where: "$TODO_LIST_NAME like ?",
       whereArgs: ["%"+pattern+"%"],
       orderBy: TODO_LIST_NAME,
