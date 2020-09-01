@@ -12,10 +12,11 @@ class ReminderTile extends StatelessWidget {
   final Function(DateTime) reminderAdded;
   final Function(Reminder) reminderUpdated;
   final Function(Reminder) reminderDeleted;
+  final bool singleLine;
   final bool allowUndo;
   final DateTime startDate;
 
-  ReminderTile(this.reminders, this.reminderAdded, this.reminderUpdated, this.reminderDeleted, {this.allowUndo=false, this.startDate});
+  ReminderTile(this.reminders, this.reminderAdded, this.reminderUpdated, this.reminderDeleted, {this.singleLine=false, this.allowUndo=false, this.startDate});
 
   @override
   Widget build(BuildContext context) {
@@ -27,10 +28,21 @@ class ReminderTile extends StatelessWidget {
   }
 
   Widget _reminderChips() {
-    return Wrap(
-      children: reminders.map((r) => _ReminderChip(r, reminderAdded, reminderUpdated, reminderDeleted, allowUndo: allowUndo,)).toList(),
-      spacing: 6,
-    );
+    var children = reminders.map((r) => _ReminderChip(r, reminderAdded, reminderUpdated, reminderDeleted, allowUndo: allowUndo,)).toList();
+    if (singleLine) {
+      return Container(
+        child: ListView(
+          children: children,
+          scrollDirection: Axis.horizontal,
+        ),
+        height: 40,
+      );
+    } else {
+      return Wrap(
+        children: children,
+        spacing: 6,
+      );
+    }
   }
 
   Future<void> _addReminder(BuildContext context) {

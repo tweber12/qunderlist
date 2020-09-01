@@ -91,7 +91,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
           }
         } else if (state is TodoListLoaded) {
             appBar = AppBar(title: Text(state.list.listName));
-            floatingActionButton = FloatingActionButton(child: Icon(Icons.add), onPressed: () {showModalBottomSheet(context: context, builder: (context) => TodoItemAdder(bloc));});
+            floatingActionButton = FloatingActionButton(child: Icon(Icons.add), onPressed: () {showModalBottomSheet(context: context, builder: (context) => TodoItemAdder(bloc), isScrollControlled: true);});
             if (state.items.totalNumberOfItems != 0) {
               body = TodoListItemList(state.items, reorderable: filter==TodoStatusFilter.active);
             } else {
@@ -315,5 +315,86 @@ class TodoListItemCard extends StatelessWidget {
             )
         )
     );
+  }
+}
+
+
+class TodoItemAdder extends StatefulWidget {
+  final TodoListBloc bloc;
+  TodoItemAdder(this.bloc);
+
+  @override
+  State<StatefulWidget> createState() {
+    return _TodoItemAdderState();
+  }
+}
+
+class _TodoItemAdderState extends State<TodoItemAdder> {
+  var nameController = TextEditingController();
+  DateTime dueDate;
+  int reminderId = 0;
+  List<Reminder> reminders = [];
+  TodoPriority priority = TodoPriority.none;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      child: Column(
+        children: <Widget>[
+          ListTile(
+            leading: Icon(Icons.title),
+            title: TextField(
+              controller: nameController,
+              decoration: InputDecoration(labelText: "Todo"),
+              autofocus: true,
+            ),
+            trailing: PriorityButton(priority, _setPriority),
+          ),
+          DueDateTile(_setDueDate),
+          ReminderTile(reminders, _addReminder, _updateReminder, _deleteReminder, startDate: dueDate, singleLine: true),
+          ButtonBar(children: [
+            RaisedButton(
+                child: Text("Add"),
+                onPressed: () {
+                  widget.bloc.add(AddItemEvent(TodoItem(
+                      nameController.text, DateTime.now(), priority: priority,
+                      dueDate: dueDate, reminders: reminders.map((r) => Reminder(r.at)).toList())));
+                  Navigator.pop(context);
+                })
+          ]),
+        ],
+        mainAxisSize: MainAxisSize.min
+      ),
+      padding: EdgeInsets.fromLTRB(10, 3, 10, MediaQuery.of(context).viewInsets.bottom+9),
+    );
+  }
+
+  void _setPriority(TodoPriority priority) {
+    setState(() {
+      this.priority = priority;
+    });
+  }
+  void _setDueDate(DateTime date) {
+    setState(() {
+      dueDate = date;
+    });
+  }
+  void _addReminder(DateTime at) {
+    setState(() {
+      reminders.add(Reminder(at, id: reminderId));
+      reminderId += 1;
+      reminders.sort((a,b) => a.at.compareTo(b.at));
+    });
+  }
+  void _updateReminder(Reminder updated) {
+    setState(() {
+      reminders = reminders.map((r) {return r.id == updated.id ? updated : r;}).toList();
+      reminders.sort((a,b) => a.at.compareTo(b.at));
+    });
+  }
+  void _deleteReminder(Reminder deleted) {
+    setState(() {
+      reminders = reminders.where((r) => r.id != deleted.id).toList();
+    });
   }
 }
