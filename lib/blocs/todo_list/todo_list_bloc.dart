@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc/bloc.dart';
 import 'package:mutex/mutex.dart';
 import 'package:qunderlist/blocs/cache.dart';
@@ -12,7 +14,15 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   // Ensure that only one process modifies the cache and db at the same time
   // This is done to avoid problems with the db and the cache getting out of sync
   final Mutex _writeMutex = Mutex();
-  TodoListBloc(R repository, TodoList list, {TodoStatusFilter filter: TodoStatusFilter.active}): _repository=repository, _list=list, this.filter=filter, super(TodoListLoading(list));
+  StreamSubscription<ExternalUpdate> _updateStream;
+  TodoListBloc(R repository, TodoList list, {TodoStatusFilter filter: TodoStatusFilter.active}):
+        _repository=repository,
+        _list=list,
+        this.filter=filter,
+        super(TodoListLoading(list))
+  {
+    _updateStream = _repository.updateStream.listen((_) => add(NotifyItemUpdateEvent(null)));
+  }
 
   ListCache<TodoItem> cache;
   TodoStatusFilter filter;
@@ -155,5 +165,11 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     this.filter = filter;
     yield TodoListLoaded(_list, cache);
     _writeMutex.release();
+  }
+
+@override
+  Future<void> close() {
+    _updateStream.cancel();
+    return super.close();
   }
 }

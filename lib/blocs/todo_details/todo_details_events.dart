@@ -106,3 +106,8 @@ class DeleteEvent extends TodoDetailsEvent {
   @override
   List<Object> get props => [];
 }
+
+class ExternalUpdateEvent extends TodoDetailsEvent {
+  @override
+  List<Object> get props => [];
+}

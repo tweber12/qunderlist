@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc/bloc.dart';
 import 'package:mutex/mutex.dart';
 import 'package:qunderlist/blocs/cache.dart';
@@ -12,7 +14,10 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
   // Ensure that only one process modifies the cache and db at the same time
   // This is done to avoid problems with the db and the cache getting out of sync
   Mutex _writeMutex = Mutex();
-  TodoListsBloc(repository): _repository=repository, super(TodoListsLoading());
+  StreamSubscription<ExternalUpdate> _updateStream;
+  TodoListsBloc(repository): _repository=repository, super(TodoListsLoading()) {
+    _updateStream = repository.updateStream.listen((_) => add(ExternalUpdateEvent()));
+  }
 
   @override
   Stream<TodoListsStates> mapEventToState(TodoListsEvents event) async* {
@@ -24,6 +29,8 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
       yield* _mapTodoListDeletedEventToState(event);
     } else if (event is TodoListsReorderedEvent) {
       yield* _mapReorderTodoListsEventToState(event);
+    } else if (event is ExternalUpdateEvent) {
+      yield* _externalUpdate(event);
     }
   }
 
@@ -62,5 +69,24 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
     yield TodoListsLoaded(cache);
     await _repository.moveTodoList(event.moveFrom.id, event.moveToIndex+1);
     _writeMutex.release();
+  }
+
+  Stream<TodoListsStates> _externalUpdate(ExternalUpdateEvent event) async* {
+    await _writeMutex.acquire();
+    var totalLength = await _repository.getNumberOfTodoLists();
+    Future<List<TodoList>> underlyingData(int start, int end) {
+      return _repository.getTodoListsChunk(start, end);
+    }
+    var newCache = ListCache(underlyingData, totalLength);
+    await newCache.init(0);
+    cache = newCache;
+    yield TodoListsLoaded(cache);
+    _writeMutex.release();
+  }
+
+  @override
+  Future<void> close() {
+    _updateStream.cancel();
+    return super.close();
   }
 }

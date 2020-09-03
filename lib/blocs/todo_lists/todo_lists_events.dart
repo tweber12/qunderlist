@@ -38,3 +38,8 @@ class TodoListsReorderedEvent extends TodoListsEvents {
   @override
   List<Object> get props => [moveFrom,moveTo,moveFromIndex,moveToIndex];
 }
+
+class ExternalUpdateEvent extends TodoListsEvents {
+  @override
+  List<Object> get props => [];
+}

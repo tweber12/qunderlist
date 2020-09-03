@@ -18,6 +18,7 @@ class DeleteReminder {
 @FlutterApi()
 abstract class DartApi {
   void notificationCallback(ItemId itemId);
+  void reloadDb();
 }
 
 @HostApi()

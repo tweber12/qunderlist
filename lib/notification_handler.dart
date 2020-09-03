@@ -66,6 +66,11 @@ class Notifier extends DartApi {
     );
   }
 
+  void reloadDb() async {
+    var repository = RepositoryProvider.of<TodoRepository>(context);
+    repository.triggerUpdate();
+  }
+
   void notificationCallback(ItemId id) {
     showItem(id.id);
   }

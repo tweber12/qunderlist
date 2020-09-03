@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc/bloc.dart';
 import 'package:mutex/mutex.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_events.dart';
@@ -43,6 +45,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   // Ensure that only one process modifies the cache and db at the same time
   // This is done to avoid problems with the db and the cache getting out of sync
   final Mutex _writeMutex = Mutex();
+  StreamSubscription _updateStream;
 
   TodoDetailsBloc(R repository, int itemId, {TodoItem item, TodoListBloc listBloc}):
         _repository=repository,
@@ -53,6 +56,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
         super(item==null ? TodoDetailsLoading() : TodoDetailsLoadedItem(item))
   {
     notifier = _listBloc!=null ? RateLimit(Duration(seconds: 1), _notifyHelper) : null;
+    _updateStream = _repository.updateStream.listen((_) => add(ExternalUpdateEvent()));
   }
 
   @override
@@ -85,6 +89,8 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
       yield* _mapCopyToListEventToState(event);
     } else if (event is DeleteEvent) {
       yield* _mapDeleteEventToState(event);
+    } else if (event is ExternalUpdateEvent) {
+      yield* _externalUpdate(event);
     } else {
       throw "BUG: Unhandled TodoDetailsEvent!";
     }
@@ -224,6 +230,13 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     cancelRemindersForItem(_item);
   }
 
+  Stream<TodoDetailsState> _externalUpdate(ExternalUpdateEvent event) async* {
+    _item = await _repository.getTodoItem(_itemId);
+    yield TodoDetailsLoadedItem(_item);
+    _lists = await _repository.getListsOfItem(_item.id);
+    yield TodoDetailsFullyLoaded(_item, _lists);
+  }
+
   Future<void> _notifyList() async {
     notifier?.call();
   }
@@ -234,7 +247,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
 
   @override
   Future<void> close() {
-    print("Close called");
+    _updateStream.cancel();
     _notifyHelper();
     return super.close();
   }

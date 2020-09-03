@@ -154,6 +154,9 @@ class CompleteService: IntentService("CompleteService") {
         }
         val itemId = p0.getLongExtra(ITEM_ID_EXTRA, 0)
         Database(this).completeItem(itemId)
+        Handler(Looper.getMainLooper()).post {
+            MainActivity.dartApi?.reloadDb { }
+        }
     }
 }
 
@@ -164,6 +167,9 @@ class SnoozeService: IntentService("SnoozeService") {
         }
         val reminderId = p0.getLongExtra(REMINDER_ID_EXTRA, 0)
         val time = Database(this).snoozeItem(reminderId)
+        Handler(Looper.getMainLooper()).post {
+            MainActivity.dartApi?.reloadDb { }
+        }
         val intent = Intent(this, AlarmService::class.java).putExtra(REMINDER_ID_EXTRA, reminderId)
         val pendingIntent: PendingIntent = PendingIntent.getBroadcast(this, reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
         val alarmManager = this.getSystemService(Context.ALARM_SERVICE) as AlarmManager
