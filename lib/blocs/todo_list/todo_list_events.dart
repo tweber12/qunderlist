@@ -86,11 +86,13 @@ class UpdateItemPriorityEvent extends TodoListEvent {
 }
 
 class ReorderItemsEvent extends TodoListEvent {
-  final int moveFrom;
-  final int moveTo;
+  final TodoItem moveFrom;
+  final int moveFromIndex;
+  final TodoItem moveTo;
+  final int moveToIndex;
 
-  ReorderItemsEvent(this.moveFrom, this.moveTo);
+  ReorderItemsEvent(this.moveFrom, this.moveFromIndex, this.moveTo, this.moveToIndex);
 
   @override
-  List<Object> get props => [moveFrom, moveTo];
+  List<Object> get props => [moveFrom, moveTo, moveFromIndex, moveToIndex];
 }

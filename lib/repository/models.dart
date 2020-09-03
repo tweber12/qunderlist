@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:qunderlist/blocs/cache.dart';
 
 enum TodoPriority {
   high,
@@ -7,7 +8,7 @@ enum TodoPriority {
   none,
 }
 
-class TodoItem {
+class TodoItem with Cacheable {
   final int id;
   final String todo;
   final bool completed;
@@ -20,6 +21,9 @@ class TodoItem {
 
   TodoItem(this.todo, this.createdOn, {this.id, this.completed = false, this.completedOn, this.priority = TodoPriority.none, this.note, this.dueDate, reminders}):
       this.reminders = reminders ?? [];
+
+  @override
+  int get cacheId => id;
 
   TodoItem copyWith({int id, String todo, bool completed, TodoPriority priority, String note, DateTime dueDate, DateTime createdOn, DateTime completedOn, List<Reminder> reminders, bool deleteDueDate=false, bool setCompletedOn=false}) {
     return TodoItem(
@@ -84,7 +88,7 @@ enum Palette {
   grey,
 }
 
-class TodoList with EquatableMixin {
+class TodoList with EquatableMixin, Cacheable {
   final int id;
   final String listName;
   final Palette color;
@@ -93,6 +97,9 @@ class TodoList with EquatableMixin {
 
   @override
   List<Object> get props => [id, color, listName];
+
+  @override
+  int get cacheId => id;
 
   TodoList withId(int id) {
     assert(this.id == null);

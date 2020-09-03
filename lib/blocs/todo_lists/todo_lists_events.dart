@@ -29,10 +29,12 @@ class TodoListDeletedEvent extends TodoListsEvents {
 }
 
 class TodoListsReorderedEvent extends TodoListsEvents {
-  final int moveFrom;
-  final int moveTo;
-  TodoListsReorderedEvent(this.moveFrom, this.moveTo);
+  final TodoList moveFrom;
+  final int moveFromIndex;
+  final TodoList moveTo;
+  final int moveToIndex;
+  TodoListsReorderedEvent(this.moveFrom, this.moveFromIndex, this.moveTo, this.moveToIndex);
 
   @override
-  List<Object> get props => [moveFrom,moveTo];
+  List<Object> get props => [moveFrom,moveTo,moveFromIndex,moveToIndex];
 }

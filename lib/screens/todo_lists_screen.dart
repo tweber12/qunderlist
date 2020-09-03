@@ -69,7 +69,7 @@ class _TodoListsListViewState extends State<TodoListsListView> {
             onDismissed: () => _bloc.add(TodoListDeletedEvent(item, index)),
             confirmMessage: "Delete list '${item.listName}'?",
           ),
-          reorderCallback: (from, to) => _bloc.add(TodoListsReorderedEvent(from, to)),
+          reorderCallback: (from, to) async => _bloc.add(TodoListsReorderedEvent(await widget.state.lists.peekItem(from), from, await widget.state.lists.peekItem(to), to)),
           itemHeight: 50
       ),
       color: Colors.blue.shade200,

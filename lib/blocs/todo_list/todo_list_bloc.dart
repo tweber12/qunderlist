@@ -21,10 +21,6 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   int get listId => _list.id;
   Palette get color => _list.color;
 
-  int findItemIndex(int itemId) {
-    return cache.findItem((item) => item.id == itemId);
-  }
-
   @override
   Stream<TodoListStates> mapEventToState(TodoListEvent event) async* {
     if (event is RenameListEvent) {
@@ -70,14 +66,14 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   Stream<TodoListStates> _mapAddItemEventToState(AddItemEvent event) async* {
     await _writeMutex.acquire();
     var id = await _repository.addTodoItem(event.item, _list.id);
-    cache = cache.addElement(cache.totalNumberOfItems, event.item.copyWith(id: id));
+    cache = cache.addElementAtEnd(event.item.copyWith(id: id));
     yield TodoListLoaded(_list, cache);
     setRemindersForItem(event.item);
     _writeMutex.release();
   }
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
     await _writeMutex.acquire();
-    cache = cache.removeElement(event.index);
+    cache = cache.removeElement(event.index, element: event.item);
     yield TodoListLoaded(_list, cache);
     var numberOfLists = (await _repository.getListsOfItem(event.item.id)).length;
     if (numberOfLists > 1) {
@@ -94,7 +90,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     await _writeMutex.acquire();
     var newItem = event.item.toggleCompleted();
     // There's not a single view which shows completed and uncompleted items, so remove it since it must've been visible before
-    cache = cache.removeElement(event.index);
+    cache = cache.removeElement(event.index, element: event.item);
     yield TodoListLoaded(_list, cache);
     await _repository.updateTodoItem(newItem);
     if (newItem.completed) {
@@ -112,7 +108,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     if (filter == TodoStatusFilter.important) {
       if (event.priority == TodoPriority.none) {
         // The item now fails the filter, so it has to be removed from the cache
-        cache = cache.removeElement(event.index);
+        cache = cache.removeElement(event.index, element: event.item);
       } else {
         // The item has changed priority, but is still shown in the list
         // That means that it's location in the list has most likely changed
@@ -123,7 +119,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       }
     } else {
       // In all other cases, the element is still being shown at the same location, so update it accordingly
-      cache = cache.updateElement(event.index, newItem);
+      cache = cache.updateElement(event.index, element: event.item);
     }
     yield TodoListLoaded(_list, cache);
     await _repository.updateTodoItem(newItem);
@@ -131,15 +127,9 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   }
   Stream<TodoListStates> _mapReorderItemsEventToState(ReorderItemsEvent event) async* {
     await _writeMutex.acquire();
-    var item = await cache.peekItem(event.moveFrom);
-    var oldCache = cache;
-    var newCache = cache.removeElement(event.moveFrom);
-//    int moveTo = event.moveTo > event.moveFrom ? event.moveTo-1 : event.moveTo;
-    newCache = newCache.addElement(event.moveTo, item);
-    cache = newCache;
+    cache = cache.reorderElements(event.moveFromIndex, event.moveToIndex, event.moveFrom, elementTo: event.moveTo);
     yield TodoListLoaded(_list, cache);
-    var moveToItem = await oldCache.peekItem(event.moveTo);
-    await _repository.moveTodoItemInList(item.id, _list.id, moveToItem.id);
+    await _repository.moveTodoItemInList(event.moveFrom.id, _list.id, event.moveTo.id);
     _writeMutex.release();
   }
   Stream<TodoListStates> _mapUpdateFilterEventToState(UpdateFilterEvent event) async* {

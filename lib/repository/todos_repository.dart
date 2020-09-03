@@ -1,6 +1,32 @@
+import 'dart:async';
+
 import 'package:qunderlist/repository/models.dart';
 
+class ExternalUpdate {
+
+}
+
 abstract class TodoRepository {
+  bool _streamActive;
+  StreamController<ExternalUpdate> _updateStream;
+
+  TodoRepository() {
+    _updateStream = StreamController.broadcast(onListen: () => _streamActive=true, onCancel: () => _streamActive=false);
+  }
+
+  void triggerUpdate() {
+    if (_streamActive) {
+      _updateStream.add(ExternalUpdate());
+    }
+  }
+
+  Stream<ExternalUpdate> get updateStream => _updateStream.stream;
+
+  void dispose() {
+    _updateStream.close();
+  }
+
+
   // Functions accessing lists
   Future<int> addTodoList(TodoList list);
   Future<void> updateTodoList(TodoList list);

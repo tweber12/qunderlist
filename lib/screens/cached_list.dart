@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:reorderables/reorderables.dart';
 
-class CachedList<T> extends StatelessWidget {
+class CachedList<T extends Cacheable> extends StatelessWidget {
   final ListCache<T> cache;
   final Widget Function(BuildContext context, int index, T item) itemBuilder;
   final double itemHeight;
@@ -62,32 +62,6 @@ class CachedList<T> extends StatelessWidget {
             }
           });
     }
-  }
-}
-
-class CachedListReorderableOld<T> extends CachedList<T> {
-  final Function(int from, int to) reorderCallback;
-
-  CachedListReorderableOld({@required cache, @required itemBuilder, @required this.reorderCallback, itemHeight=50}):
-      super(cache: cache, itemBuilder: itemBuilder, itemHeight: itemHeight);
-
-  @override
-  Widget build(BuildContext context) {
-      return CustomScrollView(
-        controller: ScrollController(),
-        slivers: <Widget>[
-          SliverPadding(
-            padding: EdgeInsets.symmetric(vertical: 6),
-            sliver: ReorderableSliverList(
-              delegate: ReorderableSliverChildBuilderDelegate(
-                _wrapItem,
-                childCount: cache.totalNumberOfItems
-              ),
-              onReorder: reorderCallback,
-            )
-          )
-        ],
-      );
   }
 }
 

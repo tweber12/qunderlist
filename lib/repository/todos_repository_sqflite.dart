@@ -10,7 +10,7 @@ import 'package:path/path.dart';
 
 const String _DEFAULT_DATABASE_NAME = "qunderlist_db.sqlite";
 
-class TodoRepositorySqflite implements TodoRepository {
+class TodoRepositorySqflite extends TodoRepository {
   static final TodoRepositorySqflite _repositorySqflite = TodoRepositorySqflite._internal();
   Database _db;
   TodoListDao listDao;

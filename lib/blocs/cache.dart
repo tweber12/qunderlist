@@ -6,7 +6,11 @@ import 'package:mutex/mutex.dart';
 
 typedef UnderlyingData<T> = Future<List<T>> Function(int, int);
 
-class ListCache<T> {
+abstract class Cacheable {
+  int get cacheId;
+}
+
+class ListCache<T extends Cacheable> {
   ListCache(this.underlyingData, this.totalNumberOfItems, {this.chunkSize=50, this.numberOfChunks=10}):
       chain = ListQueue(numberOfChunks),
       chainStart = 0,
@@ -31,6 +35,8 @@ class ListCache<T> {
   // Mutex used to indicate that a new chunk is being loaded
   Mutex loadingChunk;
 
+  // Get an item based on its index in the list. If it's not currently loaded,
+  // return null.
   T operator[] (int index) {
     print("[] => $index, $currentChunkIndex, ${chain.length}");
     if (index < chainStart || index >= chainEnd) {
@@ -46,6 +52,8 @@ class ListCache<T> {
     return chain.elementAt(currentChunkIndex).getItem(index);
   }
 
+  // Get an item based on its index in the list. If it's not currently loaded,
+  // drop the cache and reload so that the item is included.
   Future<T> getItem(int index) async {
     print("INDEX: $index (chainStart: $chainStart, chainEnd: $chainEnd)");
     if (index < chainStart || index >= chainEnd) {
@@ -62,6 +70,10 @@ class ListCache<T> {
     return chain.elementAt(currentChunkIndex).getItem(index);
   }
 
+  // Get an item based on its index in the list. If it's not currently loaded,
+  // get it from the database.
+  // The cache itself is never modified, so nothing is loaded into it and the
+  // currently active chunk isn't updated.
   Future<T> peekItem(int index) async {
     if (index < chainStart || index >= chainEnd) {
       var data = await underlyingData(index, index+1);
@@ -70,7 +82,19 @@ class ListCache<T> {
     return chain.elementAt(_findChunk(index)).getItem(index);
   }
 
-  int findItem(bool Function(T) predicate) {
+  // Find the index of an item by its id. Returns null if it's not currently loaded.
+  int findItem(int id) {
+    for (final chunk in chain) {
+      var index = chunk.findItem(id);
+      if (index != null) {
+        return index;
+      }
+    }
+    return null;
+  }
+
+  // Find the index of an item in the cache. Returns null if it's not currently loaded.
+  int findItemBy(bool Function(T) predicate) {
     for (final chunk in chain) {
       for (int i=chunk.start; i<chunk.end; i++) {
         if (predicate(chunk.getItem(i))) {
@@ -81,6 +105,8 @@ class ListCache<T> {
     return null;
   }
 
+  // Find the chunk that a given item is in.
+  // It is an error if the item is not currently loaded.
   int _findChunk(int index) {
     var chunk = chain.elementAt(currentChunkIndex);
     if (chunk.start > index) {
@@ -102,6 +128,29 @@ class ListCache<T> {
     }
   }
 
+  int _verifyIndex(T item, int index) {
+    if (item == null) {
+      return index;
+    }
+    var id = item.cacheId;
+    if (index < chainStart || index >= chainEnd) {
+      // The index isn't contained in the list. To prove that it's really not there search for it. If it's found,
+      // then return it's index, else the old index to indicate if the item is before or after the loaded piece.
+      // This is necessary, if some elements got deleted in succession and therefore the end of the chain moved
+      // Doing this search is not great from a performance perspective, but it should be highly unlikely to end
+      // up in this situation anyway
+      return findItem(id) ?? index;
+    }
+    var atIndex = chain.elementAt(_findChunk(index)).getItem(index);
+    if (atIndex.cacheId != id) {
+      return findItem(id);
+    }
+    return index;
+  }
+
+  // Load more data in the background. If the load takes place at the beginning or end
+  // of the cache depends on the currently active chunk.
+  // If the currently active chunk is neither the first or last, nothing is done.
   void _preload() {
     if (currentChunkIndex == 0 && chainStart != 0) {
       _loadChunk(_getPreviousStart(), chainStart);
@@ -111,6 +160,7 @@ class ListCache<T> {
     }
   }
 
+  // Load a chunk if it's not already there. Acquires the loadingChunk mutex first.
   Future<void> _loadChunk(int start, int end) async {
     if (chainStart < start && chainEnd > start) {
       // The chunk we were supposed to load is already there
@@ -123,6 +173,9 @@ class ListCache<T> {
     });
   }
 
+  // Internal function to actually load a new chunk. This function should not be used
+  // directly, unless the calling code acquired the loadingChunk mutex before calling
+  // this.
   Future<void> _loadChunkInternal(int start, int end) async {
     if (chainStart < start && chainEnd > start) {
       // The chunk we were supposed to load was loaded in the meantime
@@ -144,6 +197,7 @@ class ListCache<T> {
       }
       chain.addFirst(Chunk(start, data, end: end));
       chainStart = start;
+      // TODO Check if currentChunkIndex needs to be incremented to still point to the same thing
     } else {
       assert(start == chainEnd, "start=$start, chainEnd=$chainEnd, end=$end, chainStart=$chainStart");
       if (chain.length == numberOfChunks) {
@@ -155,6 +209,10 @@ class ListCache<T> {
     }
   }
 
+  // Initialize the cache by loading the chunk starting with `index` and the chunks before
+  // and after, assuming they exist.
+  // If the cache is already there and `index` would be in a chunk adjacent to what's already
+  // loaded, only load the adjacent chunk.
   Future<void> init(int index) async {
     print("INIT CALLED");
     await loadingChunk.protect(() async {
@@ -194,35 +252,69 @@ class ListCache<T> {
     });
   }
 
-  ListCache<T> updateElement(int index, T element) {
-    return _modifyChain(index, (chunk) => chunk.update(index,element), 0);
+  // Update the given element
+  // To speed up finding the element, the index of the element can be given
+  // This function does not modify the existing cache but returns a new one.
+  ListCache<T> updateElement(int index, {T element}) {
+    var verifiedIndex = _verifyIndex(element, index);
+    return _modifyChain(verifiedIndex, (chunk) => chunk.update(verifiedIndex,element), 0);
   }
 
-  ListCache<T> addElement(int index, T element) {
-    print("ADD ELEMENT: $index, $chainEnd");
-    if (index == chainEnd) {
-      // Inserting at the end of the chain. This is a bit of a special case, because usually this means that the cache can remain unchanged
-      var newChunk = chain.last.addElement(index, element);
-      return _withNewChunk(chain.length-1, newChunk, shift: 1);
+  // Add an element at a given index, before the item that's already there
+  // This function does not modify the existing cache but returns a new one.
+  ListCache<T> addElementBefore(int index, T newElement, {T beforeElement}) {
+    var verifiedIndex = _verifyIndex(beforeElement, index);
+    return _modifyChain(verifiedIndex, (chunk) => chunk.addElement(verifiedIndex, newElement), 1);
+  }
+
+  // Add an element at a given index, after the item that's already there
+  // This function does not modify the existing cache but returns a new one.
+  ListCache<T> addElementAfter(int index, T newElement, {T afterElement}) {
+    var verifiedIndex = _verifyIndex(afterElement, index) + 1;
+    if (verifiedIndex == chainEnd) {
+      return addElementAtEnd(newElement);
     }
-    return _modifyChain(index, (chunk) => chunk.addElement(index, element), 1);
+    return _modifyChain(verifiedIndex, (chunk) => chunk.addElement(verifiedIndex, newElement), 1);
   }
 
-  ListCache<T> removeElement(int index) {
-    return _modifyChain(index, (chunk) => chunk.removeElement(index), -1);
+  // Add an element at the end of the list
+  // This function does not modify the existing cache but returns a new one.
+  ListCache<T> addElementAtEnd(T element) {
+    if (totalNumberOfItems > chainEnd) {
+      // The end of the list is not loaded, so only update the total number of items
+      return ListCache.reInit(underlyingData, totalNumberOfItems+1, chunkSize, numberOfChunks, chainStart, chainEnd, chain, currentChunkIndex);
+    }
+    var newChunk = chain.last.addElementAtEnd(element);
+    return _withNewChunk(chain.length-1, newChunk, shift: 1);
   }
 
-//  Future<ListCache<T>> removeElement(int index) async {
-//    if (index < chainStart || index >= chainEnd) {
-//      // The element to remove is not contained in the cache, so there's nothing to do
-//      return this;
-//    }
-//    var chunkIndex = _findChunk(index);
-//    var chunk = chain.elementAt(chunkIndex).removeElement(index);
-//    var newChain = ListQueue.of([...chain.take(chunkIndex-1), chunk, ...chain.skip(chunkIndex+1).map((elem) => elem.shift(-1))]);
-//    return ListCache.reInit(underlyingData, totalNumberOfItems-1, chunkSize, numberOfChunks, chainStart, chainEnd-1, newChain, currentChunkIndex);
-//  }
+  // Delete the given element
+  // To speed up finding the element, the index of the element can be given
+  // This function does not modify the existing cache but returns a new one.
+  ListCache<T> removeElement(int index, {T element}) {
+    var verifiedIndex = _verifyIndex(element, index);
+    return _modifyChain(verifiedIndex, (chunk) => chunk.removeElement(verifiedIndex), -1);
+  }
 
+  ListCache<T> reorderElements(int moveFromIndex, int moveToIndex, T elementFrom, {T elementTo}) {
+    // First, delete the element that's moving from it's old position
+    var temp = removeElement(moveFromIndex, element: elementFrom);
+    // Next, move the element to it's new position
+    if (moveFromIndex < moveToIndex) {
+      // The item has moved backwards and as such is inserted after elementTo
+      // moveToIndex needs to be decremented, because elementFrom was deleted ahead of it
+      return temp.addElementAfter(moveToIndex-1, elementFrom, afterElement: elementTo);
+    } else {
+      // The item has moved forwards and as such is inserted before elementTo
+      var t2 = temp.addElementBefore(moveToIndex, elementFrom, beforeElement: elementTo);
+      print(t2.totalNumberOfItems);
+      return t2;
+    }
+  }
+
+  // Internal function to modify an item, so either update, delete or remove it
+  // If necessary, chunks are merged if they get to small or split if they get too large
+  // The actual cache is never modified, but a copy is returned
   ListCache<T> _modifyChain(int index, Chunk<T> Function(Chunk<T>) modder, int shift) {
     print("MODIFY CHAIN: $index, $shift, $chainStart, $chainEnd");
     if (index >= chainEnd) {
@@ -232,7 +324,7 @@ class ListCache<T> {
       }
       return ListCache.reInit(underlyingData, totalNumberOfItems+shift, chunkSize, numberOfChunks, chainStart, chainEnd, chain, currentChunkIndex);
     } else if (index < chainStart) {
-      // The element is not contained in the cache, but appears before the loaded segment, so that indices can be shifted
+      // The element is not contained in the cache, but appears before the loaded segment, so that indices need to be shifted by `shift`
       if (shift == 0) {
         return this;
       }
@@ -246,6 +338,7 @@ class ListCache<T> {
     return _withNewChunk(chunkIndex, newChunk, shift: shift);
   }
 
+  // Build a new cache that contains a modified chunk
   ListCache<T> _withNewChunk(int chunkIndex, Chunk<T> newChunk, {int shift=0}) {
     ListQueue<Chunk<T>> newChain;
     print("WITH NEW CHUNK: ${newChunk.length}, $chunkSize, ${chunkSize*2}, ${chunkSize~/2}");
@@ -277,9 +370,8 @@ class ListCache<T> {
 
   ListQueue<Chunk<T>> _splitChunk(int chunkIndex, Chunk<T> newChunk, {int shift=0}) {
     print("SPLITTING CHUNK");
-    int skipFront = chain.length == numberOfChunks && currentChunkIndex*2 > numberOfChunks ? 1 : 0;
     var newChain = ListQueue.of([
-      // Everything in front of the chunk to be split. If necessary, drop the first element.
+      // Everything in front of the chunk to be split
       ...chain.take(chunkIndex),
       // The chunk that has been split
       ...newChunk.split(),
@@ -307,7 +399,7 @@ class ListCache<T> {
         // Everything ahead of the modified chunk
         ...chain.take(chunkIndex),
         // The combined chunk
-        Chunk.joined(newChunk, chain.elementAt(chunkIndex+1)),
+        Chunk.joined(newChunk, chain.elementAt(chunkIndex+1), shift),
         // Everything after the modified chunk and the chunk it was joined with
         ...chain.skip(chunkIndex + 2).map((elem) => elem.shift(shift))
       ]);
@@ -317,7 +409,7 @@ class ListCache<T> {
         // Everything to the left of the modified chunk, leaving out the one directly to the left
         ...chain.take(chunkIndex - 1),
         // The combined chunk
-        Chunk.joined(chain.elementAt(chunkIndex - 1), newChunk),
+        Chunk.joined(chain.elementAt(chunkIndex - 1), newChunk, 0),
         // Everything after the modified chunk
         ...chain.skip(chunkIndex + 1).map((elem) => elem.shift(shift))
       ]);
@@ -334,23 +426,32 @@ class ListCache<T> {
   }
 }
 
-class Chunk<T> {
+class Chunk<T extends Cacheable> {
   final int start;
   final int end;
   final List<T> data;
   Chunk(this.start, this.data, {int end}):
       this.end = end ?? start+data.length;
 
-  Chunk.joined(Chunk<T> chunk1, Chunk<T> chunk2):
-      assert(chunk1.end == chunk2.start),
+  Chunk.joined(Chunk<T> chunk1, Chunk<T> chunk2, int shift):
+      assert(chunk1.end == chunk2.start+shift),
       start = chunk1.start,
-      end = chunk2.end,
+      end = chunk2.end+shift,
       data = [...chunk1.data, ...chunk2.data];
 
   int get length => data.length;
 
   T getItem(int index) {
     return (index>=start && index<end) ? data[index-start] : null;
+  }
+
+  int findItem(int itemId) {
+    for (int i=0; i<data.length; i++) {
+      if (data[i].cacheId == itemId) {
+        return i+start;
+      }
+    }
+    return null;
   }
 
   Chunk<T> update(int index, T element) {
@@ -362,6 +463,12 @@ class Chunk<T> {
   Chunk<T> addElement(int index, T element) {
     var newData = List.of(data);
     newData.insert(index-start, element);
+    return Chunk(start, newData, end: end+1);
+  }
+
+  Chunk<T> addElementAtEnd(T element) {
+    var newData = List.of(data);
+    newData.add(element);
     return Chunk(start, newData, end: end+1);
   }
 

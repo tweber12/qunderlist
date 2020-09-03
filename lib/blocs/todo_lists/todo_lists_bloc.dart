@@ -42,14 +42,14 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
   Stream<TodoListsStates> _mapTodoListAddedEventToState(TodoListAddedEvent event) async* {
     await _writeMutex.acquire();
     int id = await _repository.addTodoList(event.list);
-    cache = cache.addElement(cache.totalNumberOfItems, event.list.withId(id));
+    cache = cache.addElementAtEnd(event.list.withId(id));
     yield TodoListsLoaded(cache);
     _writeMutex.release();
   }
 
   Stream<TodoListsStates> _mapTodoListDeletedEventToState(TodoListDeletedEvent event) async* {
     await _writeMutex.acquire();
-    cache = cache.removeElement(event.index);
+    cache = cache.removeElement(event.index, element: event.list);
     yield TodoListsLoaded(cache);
     await cancelRemindersForList(event.list, _repository);
     await _repository.deleteTodoList(event.list.id);
@@ -58,12 +58,9 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
 
   Stream<TodoListsStates> _mapReorderTodoListsEventToState(TodoListsReorderedEvent event) async* {
     await _writeMutex.acquire();
-    var list = await cache.peekItem(event.moveFrom);
-    var newCache = cache.removeElement(event.moveFrom);
-    newCache = newCache.addElement(event.moveTo, list);
-    cache = newCache;
+    cache = cache.reorderElements(event.moveFromIndex, event.moveToIndex, event.moveFrom, elementTo: event.moveTo);
     yield TodoListsLoaded(cache);
-    await _repository.moveTodoList(list.id, event.moveTo+1);
+    await _repository.moveTodoList(event.moveFrom.id, event.moveToIndex+1);
     _writeMutex.release();
   }
 }

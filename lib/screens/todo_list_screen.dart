@@ -205,7 +205,7 @@ class TodoListItemList extends StatelessWidget {
               onDismissed: () => bloc.add(DeleteItemEvent(item, index: index)),
               undoAction: () => bloc.add(AddItemEvent(item)),
           ),
-          reorderCallback: reorderable ? (from, to) => bloc.add(ReorderItemsEvent(from, to)) : null,
+          reorderCallback: reorderable ? (from, to) async => bloc.add(ReorderItemsEvent(await items.peekItem(from), from, await items.peekItem(to), to)) : null,
           itemHeight: 55
       ),
       color: Theme.of(context).backgroundColor,
