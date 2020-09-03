@@ -19,7 +19,6 @@ const val ITEM_ID_EXTRA = "item_id"
 class MainActivity: FlutterActivity() {
     init {
         instance = this
-
     }
     companion object {
         var instance: MainActivity? = null
@@ -39,10 +38,7 @@ class MainActivity: FlutterActivity() {
                 return;
             }
             val intent = Intent(applicationContext(), AlarmService::class.java)
-                    .putExtra(ITEM_ID_EXTRA, arg.itemId)
                     .putExtra(REMINDER_ID_EXTRA, arg.reminderId)
-                    .putExtra(ITEM_NAME_EXTRA, arg.itemName)
-                    .putExtra(ITEM_NOTE_EXTRA, arg.itemNote?:"")
             val pendingIntent: PendingIntent = PendingIntent.getBroadcast(applicationContext(), arg.reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
             val alarmManager = instance?.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             AlarmManagerCompat.setExactAndAllowWhileIdle(
@@ -85,32 +81,30 @@ class MainActivity: FlutterActivity() {
 }
 
 const val REMINDER_ID_EXTRA = "reminder_id"
-const val ITEM_NAME_EXTRA = "item_name"
-const val ITEM_NOTE_EXTRA = "item_note"
 
 class AlarmService: BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val itemId = intent.getLongExtra(ITEM_ID_EXTRA, 0)
         val reminderId = intent.getLongExtra(REMINDER_ID_EXTRA, 0)
-        val itemName = intent.getStringExtra(ITEM_NAME_EXTRA)
-        val itemNote = intent.getStringExtra(ITEM_NOTE_EXTRA)
-        val notifyIntent = Intent(context, NotificationService::class.java).putExtra(ITEM_ID_EXTRA, itemId)
-//            val intent = Intent(applicationContext(), Test::class.java).apply {
-//                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
-//            }.addCategory(Intent.CATEGORY_LAUNCHER).putExtra(ITEM_ID_EXTRA, arg.id).putExtra("FOO", "FOO")
-        val pendingIntent: PendingIntent = PendingIntent.getService(context, reminderId.toInt(), notifyIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val item = Database(context).getItem(reminderId)
+        val showItemIntent = Intent(context, NotificationService::class.java).putExtra(ITEM_ID_EXTRA, item.id)
+        val showItemPendingIntent: PendingIntent = PendingIntent.getService(context, reminderId.toInt(), showItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val completeItemIntent = Intent(context, CompleteService::class.java).putExtra(ITEM_ID_EXTRA, item.id)
+        val completeItemPendingIntent: PendingIntent = PendingIntent.getService(context, reminderId.toInt(), completeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val snoozeItemIntent = Intent(context, SnoozeService::class.java).putExtra(REMINDER_ID_EXTRA, reminderId)
+        val snoozeItemPendingIntent: PendingIntent = PendingIntent.getService(context, reminderId.toInt(), snoozeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
 
         createNotificationChannel(context)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(itemName)
-                .setContentIntent(pendingIntent)
+                .setContentTitle(item.name)
+                .setContentIntent(showItemPendingIntent)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-        if (!itemNote.isBlank()) {
-            builder.setContentText(itemNote)
+                .addAction(0, "Complete", completeItemPendingIntent)
+                .addAction(0, "Snooze", snoozeItemPendingIntent)
+        if (!item.note.isBlank()) {
+            builder.setContentText(item.note)
         }
         with(NotificationManagerCompat.from(context)) {
-            // notificationId is a unique int for each notification that you must define
             notify(reminderId.toInt(), builder.build())
         }
     }
@@ -150,5 +144,34 @@ class NotificationService: IntentService("NotificationService") {
         } else {
             MainActivity.callback = itemId as Long
         }
+    }
+}
+
+class CompleteService: IntentService("CompleteService") {
+    override fun onHandleIntent(p0: Intent?) {
+        if (p0 == null) {
+            return
+        }
+        val itemId = p0.getLongExtra(ITEM_ID_EXTRA, 0)
+        Database(this).completeItem(itemId)
+    }
+}
+
+class SnoozeService: IntentService("SnoozeService") {
+    override fun onHandleIntent(p0: Intent?) {
+        if (p0 == null) {
+            return
+        }
+        val reminderId = p0.getLongExtra(REMINDER_ID_EXTRA, 0)
+        val time = Database(this).snoozeItem(reminderId)
+        val intent = Intent(this, AlarmService::class.java).putExtra(REMINDER_ID_EXTRA, reminderId)
+        val pendingIntent: PendingIntent = PendingIntent.getBroadcast(this, reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val alarmManager = this.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        AlarmManagerCompat.setExactAndAllowWhileIdle(
+                alarmManager,
+                AlarmManager.RTC_WAKEUP,
+                time,
+                pendingIntent
+        )
     }
 }

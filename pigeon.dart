@@ -1,6 +1,5 @@
 // Generate code by running
-// C:\Users\torst\devel\flutter\bin\flutter pub run pigeon --input pigeon.dart --dart_out lib\pigeon.dart --java_out android\app\src\main\java\dev\flutter\pigeon
-//\Pigeon.java --java_package "dev.flutter.pigeon"
+// C:\Users\torst\devel\flutter\bin\flutter pub run pigeon --input pigeon.dart --dart_out lib\pigeon.dart --java_out android\app\src\main\java\dev\flutter\pigeon\Pigeon.java --java_package "dev.flutter.pigeon"
 
 import 'package:pigeon/pigeon.dart';
 
@@ -10,9 +9,6 @@ class ItemId {
 
 class SetReminder {
   int reminderId;
-  int itemId;
-  String itemName;
-  String itemNote;
   int time;
 }
 class DeleteReminder {

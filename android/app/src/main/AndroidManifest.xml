@@ -2,6 +2,7 @@
     package="com.torweb.qunderlist">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <!-- io.flutter.app.FlutterApplication is an android.app.Application that
          calls FlutterMain.startInitialization(this); in its onCreate method.
@@ -44,6 +45,14 @@
 
         <service
             android:name=".NotificationService"
+            android:exported="false">
+        </service>
+        <service
+            android:name=".SnoozeService"
+            android:exported="false">
+        </service>
+        <service
+            android:name=".CompleteService"
             android:exported="false">
         </service>
         <receiver

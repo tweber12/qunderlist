@@ -103,7 +103,6 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     _repository.updateTodoItem(_item);
-    updateAllRemindersForNotification(_item);
   }
 
   Stream<TodoDetailsState> _mapUpdatePriorityEventToState(UpdatePriorityEvent event) async* {
@@ -117,9 +116,9 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _item = _item.toggleCompleted();
     yield TodoDetailsFullyLoaded(_item, _lists);
     if (_item.completed) {
-      cancelAllNotificationsForItem(_item);
+      cancelRemindersForItem(_item);
     } else {
-      setAllNotificationsForItem(_item);
+      setRemindersForItem(_item);
     }
     _notifyList();
     _repository.updateTodoItem(_item);
@@ -130,7 +129,6 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     _repository.updateTodoItem(_item);
-    updateAllRemindersForNotification(_item);
   }
 
   Stream<TodoDetailsState> _mapUpdateDueDateEventToState(UpdateDueDateEvent event) async* {
@@ -147,7 +145,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _item = _item.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
-    setNotificationForItem(_item, event.reminder.withId(id));
+    setReminder(event.reminder.withId(id));
   }
 
   Stream<TodoDetailsState> _mapUpdateReminderEventToState(UpdateReminderEvent event) async* {
@@ -156,7 +154,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     _repository.updateReminder(event.reminder.id, event.reminder.at);
-    updateNotificationForItem(_item, event.reminder);
+    setReminder(event.reminder);
   }
 
   Stream<TodoDetailsState> _mapDeleteReminderEventToState(DeleteReminderEvent event) async* {
@@ -165,7 +163,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     _repository.deleteReminder(event.reminder.id);
-    cancelNotificationForItem(event.reminder.id);
+    cancelReminder(event.reminder);
   }
 
   Stream<TodoDetailsState> _mapAddToListEventToState(AddToListEvent event) async* {
@@ -198,7 +196,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapDeleteEventToState(DeleteEvent event) async* {
     _notifyList();
     await _repository.deleteTodoItem(_item.id);
-    cancelAllNotificationsForItem(_item);
+    cancelRemindersForItem(_item);
   }
 
   Future<void> _notifyList() async {

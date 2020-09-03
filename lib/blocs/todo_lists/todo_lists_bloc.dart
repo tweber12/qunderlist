@@ -42,7 +42,7 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
   Stream<TodoListsStates> _mapTodoListDeletedEventToState(TodoListDeletedEvent event) async* {
     cache = cache.removeElement(event.index);
     yield TodoListsLoaded(cache);
-    await cancelAllNotificationsForList(event.list, _repository);
+    await cancelRemindersForList(event.list, _repository);
     await _repository.deleteTodoList(event.list.id);
   }
 

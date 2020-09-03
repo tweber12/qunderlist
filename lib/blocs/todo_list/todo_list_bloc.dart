@@ -8,7 +8,7 @@ import 'package:qunderlist/repository/repository.dart';
 class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoListStates> {
   R _repository;
   TodoList _list;
-  TodoListBloc(R repository, TodoList list): _repository=repository, _list=list, super(TodoListLoading(list));
+  TodoListBloc(R repository, TodoList list, {TodoStatusFilter filter: TodoStatusFilter.active}): _repository=repository, _list=list, this.filter=filter, super(TodoListLoading(list));
 
   ListCache<TodoItem> cache;
   TodoStatusFilter filter;
@@ -53,7 +53,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     yield TodoListLoaded(_list, cache);
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {
-    await cancelAllNotificationsForList(_list, _repository);
+    await cancelRemindersForList(_list, _repository);
     await _repository.deleteTodoList(_list.id);
     yield TodoListDeleted();
   }
@@ -67,7 +67,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     var id = await _repository.addTodoItem(event.item, _list.id);
     cache = cache.addElement(cache.totalNumberOfItems, event.item.copyWith(id: id));
     yield TodoListLoaded(_list, cache);
-    setAllNotificationsForItem(event.item);
+    setRemindersForItem(event.item);
   }
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
     cache = cache.removeElement(event.index);
@@ -79,7 +79,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     } else {
       // No other lists contain this item, so delete it and all it's reminders
       await _repository.deleteTodoItem(event.item.id);
-      cancelAllNotificationsForItem(event.item);
+      cancelRemindersForItem(event.item);
     }
   }
   Stream<TodoListStates> _mapCompleteItemEventToState(CompleteItemEvent event) async* {
@@ -90,10 +90,10 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     _repository.updateTodoItem(newItem);
     if (newItem.completed) {
       // The event has been completed, so remove all notifications
-      cancelAllNotificationsForItem(event.item);
+      cancelRemindersForItem(event.item);
     } else {
       // The event has been activated again, so activate all notifications as well
-      setAllNotificationsForItem(event.item);
+      setRemindersForItem(event.item);
     }
   }
   Stream<TodoListStates> _mapUpdateItemPriorityEventToState(UpdateItemPriorityEvent event) async* {

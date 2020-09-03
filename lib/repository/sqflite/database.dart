@@ -10,7 +10,6 @@ const String TODO_LIST_ORDERING = "list_ordering";
 
 const String TODO_ITEMS_TABLE = "todo_items";
 const String TODO_ITEM_NAME = "item_name";
-const String TODO_ITEM_COMPLETED = "item_complete";
 const String TODO_ITEM_PRIORITY = "item_priority";
 const String TODO_ITEM_NOTE = "item_note";
 const String TODO_ITEM_DUE_DATE = "item_due";
@@ -47,7 +46,6 @@ Future<void> createDatabase(Database db, int version) async {
       create table $TODO_ITEMS_TABLE (
         $ID integer primary key,
         $TODO_ITEM_NAME text,
-        $TODO_ITEM_COMPLETED tinyint,
         $TODO_ITEM_PRIORITY tinyint,
         $TODO_ITEM_NOTE text,
         $TODO_ITEM_DUE_DATE text,
@@ -120,7 +118,6 @@ Map<String, dynamic> todoListToRepresentation(TodoList list, {int ordering}) {
 Map<String, dynamic> todoItemToRepresentation(TodoItem item) {
   var map = {
     TODO_ITEM_NAME: item.todo,
-    TODO_ITEM_COMPLETED: item.completed ? 1 : 0,
     TODO_ITEM_PRIORITY: item.priority.index,
     TODO_ITEM_NOTE: item.note,
     TODO_ITEM_DUE_DATE: item.dueDate?.toIso8601String(),
@@ -136,7 +133,7 @@ TodoItem todoItemFromRepresentation(
     representation[TODO_ITEM_NAME],
     DateTime.parse(representation[TODO_ITEM_CREATED_DATE]),
     id: representation[ID],
-    completed: representation[TODO_ITEM_COMPLETED] == 1,
+    completed: representation[TODO_ITEM_COMPLETED_DATE] != null,
     priority: TodoPriority.values[representation[TODO_ITEM_PRIORITY]],
     note: representation[TODO_ITEM_NOTE],
     dueDate: representation[TODO_ITEM_DUE_DATE] == null
