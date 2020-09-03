@@ -30,6 +30,11 @@ data class ItemDescription(
         val note: String
 )
 
+data class Reminder(
+        val id: Long,
+        val time: Long
+)
+
 class Database(context: Context) {
     init {
         if (db == null) {
@@ -90,7 +95,7 @@ class Database(context: Context) {
         val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US);
         val snoozed = Calendar.getInstance()
         snoozed.isLenient = true
-        snoozed.add(Calendar.SECOND, 20)
+        snoozed.add(Calendar.HOUR, 1)
         val time = Date(snoozed.timeInMillis)
         val content = ContentValues()
         val iso8601 = format.format(time);
@@ -102,5 +107,27 @@ class Database(context: Context) {
                 arrayOf(reminderId.toString())
         )
         return snoozed.timeInMillis
+    }
+
+    fun getActiveReminders(): List<Reminder> {
+        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US);
+        val now = format.format(Date());
+        val cursorReminders = db!!.query(
+                "todo_reminders",
+                arrayOf("id", "reminder_time"),
+                "reminder_time >= ?",
+                arrayOf(now),
+                null,
+                null,
+                null
+        )
+        var list = mutableListOf<Reminder>()
+        while (cursorReminders.moveToNext()) {
+            val id = cursorReminders.getLong(0)
+            val iso8601 = cursorReminders.getString(1)
+            val time = format.parse(iso8601).time;
+            list.add(Reminder(id, time))
+        }
+        return list
     }
 }

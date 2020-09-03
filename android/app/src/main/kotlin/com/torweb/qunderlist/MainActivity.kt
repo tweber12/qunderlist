@@ -181,3 +181,20 @@ class SnoozeService: IntentService("SnoozeService") {
         )
     }
 }
+
+class RebootReceiver: BroadcastReceiver() {
+    override fun onReceive(context: Context, p1: Intent?) {
+        val reminders = Database(context).getActiveReminders()
+        for (reminder in reminders) {
+            val intent = Intent(context, AlarmService::class.java).putExtra(REMINDER_ID_EXTRA, reminder.id)
+            val pendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminder.id.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            AlarmManagerCompat.setExactAndAllowWhileIdle(
+                    alarmManager,
+                    AlarmManager.RTC_WAKEUP,
+                    reminder.time,
+                    pendingIntent
+            )
+        }
+    }
+}
