@@ -1,4 +1,5 @@
 import 'package:bloc/bloc.dart';
+import 'package:mutex/mutex.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_events.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_states.dart';
@@ -8,6 +9,9 @@ import 'package:qunderlist/repository/repository.dart';
 class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoListStates> {
   R _repository;
   TodoList _list;
+  // Ensure that only one process modifies the cache and db at the same time
+  // This is done to avoid problems with the db and the cache getting out of sync
+  final Mutex _writeMutex = Mutex();
   TodoListBloc(R repository, TodoList list, {TodoStatusFilter filter: TodoStatusFilter.active}): _repository=repository, _list=list, this.filter=filter, super(TodoListLoading(list));
 
   ListCache<TodoItem> cache;
@@ -64,12 +68,15 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     yield* _updateCacheForce();
   }
   Stream<TodoListStates> _mapAddItemEventToState(AddItemEvent event) async* {
+    await _writeMutex.acquire();
     var id = await _repository.addTodoItem(event.item, _list.id);
     cache = cache.addElement(cache.totalNumberOfItems, event.item.copyWith(id: id));
     yield TodoListLoaded(_list, cache);
     setRemindersForItem(event.item);
+    _writeMutex.release();
   }
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
+    await _writeMutex.acquire();
     cache = cache.removeElement(event.index);
     yield TodoListLoaded(_list, cache);
     var numberOfLists = (await _repository.getListsOfItem(event.item.id)).length;
@@ -81,13 +88,15 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       await _repository.deleteTodoItem(event.item.id);
       cancelRemindersForItem(event.item);
     }
+    _writeMutex.release();
   }
   Stream<TodoListStates> _mapCompleteItemEventToState(CompleteItemEvent event) async* {
+    await _writeMutex.acquire();
     var newItem = event.item.toggleCompleted();
     // There's not a single view which shows completed and uncompleted items, so remove it since it must've been visible before
     cache = cache.removeElement(event.index);
     yield TodoListLoaded(_list, cache);
-    _repository.updateTodoItem(newItem);
+    await _repository.updateTodoItem(newItem);
     if (newItem.completed) {
       // The event has been completed, so remove all notifications
       cancelRemindersForItem(event.item);
@@ -95,8 +104,10 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       // The event has been activated again, so activate all notifications as well
       setRemindersForItem(event.item);
     }
+    _writeMutex.release();
   }
   Stream<TodoListStates> _mapUpdateItemPriorityEventToState(UpdateItemPriorityEvent event) async* {
+    await _writeMutex.acquire();
     var newItem = event.item.copyWith(priority: event.priority);
     if (filter == TodoStatusFilter.important) {
       if (event.priority == TodoPriority.none) {
@@ -116,8 +127,10 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     }
     yield TodoListLoaded(_list, cache);
     await _repository.updateTodoItem(newItem);
+    _writeMutex.release();
   }
   Stream<TodoListStates> _mapReorderItemsEventToState(ReorderItemsEvent event) async* {
+    await _writeMutex.acquire();
     var item = await cache.peekItem(event.moveFrom);
     var oldCache = cache;
     var newCache = cache.removeElement(event.moveFrom);
@@ -127,6 +140,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     yield TodoListLoaded(_list, cache);
     var moveToItem = await oldCache.peekItem(event.moveTo);
     await _repository.moveTodoItemInList(item.id, _list.id, moveToItem.id);
+    _writeMutex.release();
   }
   Stream<TodoListStates> _mapUpdateFilterEventToState(UpdateFilterEvent event) async* {
     yield* _updateCacheWithFilter(event.filter);
@@ -139,6 +153,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     yield* _updateCacheForce(newFilter: filter);
   }
   Stream<TodoListStates> _updateCacheForce({TodoStatusFilter newFilter}) async* {
+    await _writeMutex.acquire();
     var filter = newFilter ?? this.filter;
     var totalLength = await _repository.getNumberOfTodoItems(_list.id, filter);
     Future<List<TodoItem>> underlyingData(int start, int end) {
@@ -149,5 +164,6 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     cache = newCache;
     this.filter = filter;
     yield TodoListLoaded(_list, cache);
+    _writeMutex.release();
   }
 }
