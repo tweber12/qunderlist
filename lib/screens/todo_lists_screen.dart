@@ -88,8 +88,7 @@ class TodoListCard extends StatelessWidget {
       child: InkWell(
         child: Container(
           height: 50,
-          child: Row(children: [Text(list.listName, style: TextStyle(fontSize: 15))], crossAxisAlignment: CrossAxisAlignment.center,),
-          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: ListTile(leading: Icon(Icons.list), title: Text(list.listName, style: TextStyle(fontSize: 15))),
         ),
         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, RepositoryProvider.of<TodoRepository>(context), list))),
       ),
