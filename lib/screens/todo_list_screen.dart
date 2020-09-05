@@ -237,7 +237,7 @@ class TodoListItemCard extends StatelessWidget {
         ),
         onTap: () => _showDetails(context),
       ),
-      margin: EdgeInsets.symmetric(vertical: 0.5),
+      margin: EdgeInsets.symmetric(vertical: 1),
     );
   }
 
