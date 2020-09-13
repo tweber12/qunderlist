@@ -8,7 +8,7 @@ enum TodoPriority {
   none,
 }
 
-class TodoItem with Cacheable {
+class TodoItem with Cacheable, EquatableMixin {
   final int id;
   final String todo;
   final bool completed;
@@ -46,6 +46,9 @@ class TodoItem with Cacheable {
       return this.copyWith(completed: true, completedOn: DateTime.now());
     }
   }
+
+  @override
+  List<Object> get props => [id, todo, note, createdOn, completedOn, priority, dueDate, ...reminders];
 }
 
 enum TodoStatusFilter {

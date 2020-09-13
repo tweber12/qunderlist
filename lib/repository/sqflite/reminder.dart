@@ -20,7 +20,7 @@ class ReminderDao {
 
   Future<List<Reminder>> getReminders(int itemId) async {
     var results = await _db.query(TODO_REMINDERS_TABLE,
-        columns: [TODO_REMINDER_TIME],
+        columns: [ID, TODO_REMINDER_TIME],
         where: "$TODO_REMINDER_ITEM = ?",
         whereArgs: [itemId]);
     return results.map(reminderFromRepresentation).toList();

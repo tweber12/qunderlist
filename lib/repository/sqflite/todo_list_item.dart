@@ -37,8 +37,8 @@ class TodoListItemDao {
 
   Future<void> moveTodoItemToList(int itemId, int oldListId, int newListId) async {
     return _db.transaction((txn) async {
-      await removeTodoItemFromList(itemId, oldListId, db: txn);
       await addItemToList(itemId, newListId, db: txn);
+      await removeTodoItemFromList(itemId, oldListId, db: txn);
     });
   }
 
