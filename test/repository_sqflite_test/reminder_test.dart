@@ -3,11 +3,13 @@ import 'package:qunderlist/repository/models.dart';
 import 'package:qunderlist/repository/sqflite/database.dart';
 import 'package:qunderlist/repository/sqflite/reminder.dart';
 import 'package:qunderlist/repository/sqflite/todo_item.dart';
+import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 import 'package:sqflite/sqlite_api.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
   Database db;
+  TodoRepositorySqflite repository;
   ReminderDao dao;
   List<int> itemIds;
   Map<int,List<Reminder>> reminders = Map();
@@ -17,9 +19,10 @@ void main() {
   setUp(() async {
     db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath,
         options: OpenDatabaseOptions(version: 1, onCreate: createDatabase, onConfigure: configureDatabase));
-    dao = ReminderDao(db);
+    repository = await TodoRepositorySqflite.getInstance(db: db);
+    dao = repository.reminderDao;
     var now = DateTime.now();
-    var itemDao = TodoItemDao(db);
+    var itemDao = repository.itemDao;
     itemIds = List();
     for (int i=0; i<3; i++) {
       itemIds.add(await itemDao.addTodoItem(TodoItem("item $i", now)));
@@ -29,7 +32,7 @@ void main() {
       var r = List<Reminder>();
       for (int i=0; i<s; i++) {
         var date = now.add(Duration(days: i));
-        var id = await dao.addReminder(itemId, date);
+        var id = await repository.addReminder(itemId, date);
         r.add(Reminder(date, id: id));
       }
       s+=1;
@@ -39,7 +42,7 @@ void main() {
   tearDown(() async {
     await db.close();
     db = null;
-    dao = null;
+    repository = null;
     itemIds = null;
   });
 
@@ -52,32 +55,28 @@ void main() {
   });
 
   test('get reminders for items all test', () async {
+    var resultReminders = await dao.getRemindersForItems(itemIds);
+    expect(resultReminders.length, itemIds.length);
     for (final itemId in itemIds) {
-      var resultReminders = await dao.getRemindersForItems(itemIds);
-      expect(resultReminders.length, itemIds.length);
-      for (final itemId in itemIds) {
-        resultReminders[itemId].sort((a,b) => a.id.compareTo(b.id));
-        expect(resultReminders[itemId], reminders[itemId]);
-      }
+      resultReminders[itemId].sort((a,b) => a.id.compareTo(b.id));
+      expect(resultReminders[itemId], reminders[itemId]);
     }
   });
 
   test('get reminders for items two test', () async {
-    for (final itemId in itemIds) {
-      var resultReminders = await dao.getRemindersForItems(itemIds.skip(1).toList());
-      expect(resultReminders.length, itemIds.length-1);
-      for (final itemId in resultReminders.keys) {
-        resultReminders[itemId].sort((a,b) => a.id.compareTo(b.id));
-        expect(resultReminders[itemId], reminders[itemId]);
-      }
+    var resultReminders = await dao.getRemindersForItems(itemIds.skip(1).toList());
+    expect(resultReminders.length, itemIds.length-1);
+    for (final itemId in resultReminders.keys) {
+      resultReminders[itemId].sort((a,b) => a.id.compareTo(b.id));
+      expect(resultReminders[itemId], reminders[itemId]);
     }
   });
 
   test('delete reminders test', () async {
     var delId = itemIds.last;
-    await dao.deleteReminder(reminders[delId][1].id);
+    await repository.deleteReminder(reminders[delId][1].id);
     reminders[delId].removeAt(1);
-    await dao.deleteReminder(reminders[delId][2].id);
+    await repository.deleteReminder(reminders[delId][2].id);
     reminders[delId].removeAt(2);
     var resultReminders = await dao.getRemindersForItems(itemIds);
     expect(resultReminders.length, itemIds.length);
@@ -90,7 +89,7 @@ void main() {
   test('delete all reminders of item test', () async {
     var delId = itemIds.last;
     for (final reminder in reminders[delId]) {
-      await dao.deleteReminder(reminder.id);
+      await repository.deleteReminder(reminder.id);
     }
     var resultReminders = await dao.getRemindersForItems(itemIds);
     expect(resultReminders.length, itemIds.length-1);
@@ -118,9 +117,9 @@ void main() {
 
   test('update reminders test', () async {
     var now = DateTime.now();
-    await dao.updateReminder(reminders[2][0].id, now);
+    await repository.updateReminder(reminders[2][0].id, now);
     reminders[2][0] = reminders[2][0].copyWith(at: now);
-    await dao.updateReminder(reminders[1][1].id, now.add(Duration(hours: 3)));
+    await repository.updateReminder(reminders[1][1].id, now.add(Duration(hours: 3)));
     reminders[1][1] = reminders[1][1].copyWith(at: now.add(Duration(hours: 3)));
     var resultReminders = await dao.getRemindersForItems(itemIds);
     for (final itemId in resultReminders.keys) {

@@ -115,7 +115,7 @@ Map<String, dynamic> todoListToRepresentation(TodoList list, {int ordering}) {
   return map;
 }
 
-Map<String, dynamic> todoItemToRepresentation(TodoItem item) {
+Map<String, dynamic> todoItemToRepresentation(TodoItemBase item) {
   var map = {
     TODO_ITEM_NAME: item.todo,
     TODO_ITEM_PRIORITY: item.priority.index,
@@ -127,13 +127,30 @@ Map<String, dynamic> todoItemToRepresentation(TodoItem item) {
   return map;
 }
 
+TodoItemShort todoItemShortFromRepresentation(
+    Map<String, dynamic> representation, int nActiveReminders) {
+  return TodoItemShort(
+    representation[TODO_ITEM_NAME],
+    DateTime.parse(representation[TODO_ITEM_CREATED_DATE]),
+    id: representation[ID],
+    priority: TodoPriority.values[representation[TODO_ITEM_PRIORITY]],
+    note: representation[TODO_ITEM_NOTE],
+    dueDate: representation[TODO_ITEM_DUE_DATE] == null
+        ? null
+        : DateTime.parse(representation[TODO_ITEM_DUE_DATE]),
+    completedOn: representation[TODO_ITEM_COMPLETED_DATE] == null
+        ? null
+        : DateTime.parse(representation[TODO_ITEM_COMPLETED_DATE]),
+    nActiveReminders: nActiveReminders,
+  );
+}
+
 TodoItem todoItemFromRepresentation(
     Map<String, dynamic> representation, List<Reminder> reminders) {
   return TodoItem(
     representation[TODO_ITEM_NAME],
     DateTime.parse(representation[TODO_ITEM_CREATED_DATE]),
     id: representation[ID],
-    completed: representation[TODO_ITEM_COMPLETED_DATE] != null,
     priority: TodoPriority.values[representation[TODO_ITEM_PRIORITY]],
     note: representation[TODO_ITEM_NOTE],
     dueDate: representation[TODO_ITEM_DUE_DATE] == null

@@ -141,7 +141,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
 
   Stream<TodoDetailsState> _mapUpdateNoteEventToState(UpdateNoteEvent event) async* {
     await _writeMutex.acquire();
-    _item = _item.copyWith(note: event.newNote);
+    _item = _item.copyWith(note: Nullable(event.newNote));
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     await _repository.updateTodoItem(_item);
@@ -150,7 +150,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
 
   Stream<TodoDetailsState> _mapUpdateDueDateEventToState(UpdateDueDateEvent event) async* {
     await _writeMutex.acquire();
-    _item = _item.copyWith(dueDate: event.newDueDate, deleteDueDate: true);
+    _item = _item.copyWith(dueDate: Nullable(event.newDueDate));
     yield TodoDetailsFullyLoaded(_item, _lists);
     _notifyList();
     await _repository.updateTodoItem(_item);

@@ -21,7 +21,7 @@ class TodoRepositorySqflite extends TodoRepository {
   static Future<TodoRepositorySqflite> getInstance({Database db}) async {
     if (db != null) {
       _repositorySqflite._db = db;
-      _repositorySqflite.init();
+      await _repositorySqflite.init();
       return _repositorySqflite;
     }
     if (_repositorySqflite._db == null) {
@@ -80,7 +80,7 @@ class TodoRepositorySqflite extends TodoRepository {
   }
 
   @override
-  Future<void> updateTodoItem(TodoItem item) => itemDao.updateTodoItem(item);
+  Future<void> updateTodoItem(TodoItemBase item) => itemDao.updateTodoItem(item);
 
   @override
   Future<void> deleteTodoItem(int itemId) => itemDao.deleteTodoItem(itemId);

@@ -39,7 +39,7 @@ abstract class TodoRepository {
   Future<List<TodoList>> getMatchingLists(String pattern, {int limit=5});
 
   // Functions accessing items
-  Future<void> updateTodoItem(TodoItem item);
+  Future<void> updateTodoItem(TodoItemBase item);
   Future<void> deleteTodoItem(int itemId);
   Future<TodoItem> getTodoItem(int id);
 

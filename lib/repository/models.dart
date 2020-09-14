@@ -8,47 +8,107 @@ enum TodoPriority {
   none,
 }
 
-class TodoItem with Cacheable, EquatableMixin {
+abstract class TodoItemBase with Cacheable, EquatableMixin {
   final int id;
   final String todo;
-  final bool completed;
   final TodoPriority priority;
   final String note;
   final DateTime dueDate;
   final DateTime createdOn;
   final DateTime completedOn;
+
+  TodoItemBase(this.todo, this.createdOn, {this.id, this.completedOn, this.priority = TodoPriority.none, this.note, this.dueDate});
+
+  bool get completed => completedOn!=null;
+
+  int get nActiveReminders;
+
+  @override
+  List<Object> get props => [id, todo, note, createdOn, completedOn, priority, dueDate];
+
+  @override
+  int get cacheId => id;
+}
+
+class TodoItemShort extends TodoItemBase {
+  final int _nActiveReminders;
+
+  TodoItemShort(String title, DateTime createdOn, {int id, DateTime completedOn, TodoPriority priority = TodoPriority.none, String note, DateTime dueDate, int nActiveReminders=0}):
+      _nActiveReminders = nActiveReminders,
+      super(title, createdOn, id: id, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate);
+
+  @override
+  int get nActiveReminders => _nActiveReminders;
+
+  @override
+  List<Object> get props => [...super.props, _nActiveReminders];
+
+  TodoItemShort copyWith({int id, String todo, TodoPriority priority, DateTime createdOn, Nullable<String> note, Nullable<DateTime> dueDate, Nullable<DateTime> completedOn, int nActiveReminders}) {
+    return TodoItemShort(
+      todo ?? this.todo,
+      createdOn ?? this.createdOn,
+      id: id ?? this.id,
+      priority: priority ?? this.priority,
+      note: note?.value ?? this.note,
+      dueDate: dueDate?.value ?? this.dueDate,
+      completedOn: completedOn?.value ?? this.completedOn,
+      nActiveReminders: nActiveReminders ?? _nActiveReminders,
+    );
+  }
+
+  TodoItemShort toggleCompleted() {
+    if (completed) {
+      return copyWith(completedOn: Nullable(null));
+    } else {
+      return copyWith(completedOn: Nullable(DateTime.now()));
+    }
+  }
+}
+
+class TodoItem extends TodoItemBase {
   final List<Reminder> reminders;
 
-  TodoItem(this.todo, this.createdOn, {this.id, this.completed = false, this.completedOn, this.priority = TodoPriority.none, this.note, this.dueDate, reminders}):
-      this.reminders = reminders ?? [];
+  TodoItem(String title, DateTime createdOn, {int id, DateTime completedOn, TodoPriority priority = TodoPriority.none, String note, DateTime dueDate, List<Reminder> reminders}):
+        this.reminders = reminders ?? [],
+        super(title, createdOn, id: id, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate);
 
   @override
   int get cacheId => id;
 
-  TodoItem copyWith({int id, String todo, bool completed, TodoPriority priority, String note, DateTime dueDate, DateTime createdOn, DateTime completedOn, List<Reminder> reminders, bool deleteDueDate=false, bool setCompletedOn=false}) {
+  @override
+  int get nActiveReminders {
+    var now = DateTime.now();
+    return reminders.where((element) => element.at.isAfter(now)).length;
+  }
+
+  TodoItem copyWith({int id, String todo, TodoPriority priority, DateTime createdOn, Nullable<String> note, Nullable<DateTime> dueDate, Nullable<DateTime> completedOn, List<Reminder> reminders}) {
     return TodoItem(
       todo ?? this.todo,
       createdOn ?? this.createdOn,
       id: id ?? this.id,
-      completed: completed ?? this.completed,
       priority: priority ?? this.priority,
-      note: note ?? this.note,
-      dueDate: dueDate!=null || deleteDueDate ? dueDate : this.dueDate,
-      completedOn: completedOn!=null || setCompletedOn ? completedOn : this.completedOn,
+      note: note?.value ?? this.note,
+      dueDate: dueDate?.value ?? this.dueDate,
+      completedOn: completedOn?.value ?? this.completedOn,
       reminders: reminders ?? this.reminders,
     );
   }
 
   TodoItem toggleCompleted() {
     if (completed) {
-      return this.copyWith(completed: false, completedOn: null, setCompletedOn: true);
+      return copyWith(completedOn: Nullable(null));
     } else {
-      return this.copyWith(completed: true, completedOn: DateTime.now());
+      return copyWith(completedOn: Nullable(DateTime.now()));
     }
   }
 
   @override
-  List<Object> get props => [id, todo, note, createdOn, completedOn, priority, dueDate, ...reminders];
+  List<Object> get props => [...super.props, ...reminders];
+}
+
+class Nullable<T> {
+  final T value;
+  Nullable(this.value);
 }
 
 enum TodoStatusFilter {
@@ -127,24 +187,5 @@ class Reminder with EquatableMixin {
       at ?? this.at,
       id: this.id,
     );
-  }
-}
-
-class Chunk<T> with EquatableMixin {
-  final int start;
-  final int end;
-  final int totalLength;
-  final List<T> data;
-  Chunk(this.start, this.data, this.totalLength): end = start + data.length;
-
-  @override
-  List<Object> get props => [start, end, data];
-
-  bool contains(int index) {
-    return start <= index && end > index;
-  }
-  T get(int index, {bool relative: false}) {
-    var i = relative ? index : index-start;
-    return data[i];
   }
 }

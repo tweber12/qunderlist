@@ -52,12 +52,27 @@ void main() {
   test('item representation test full', () async {
     var now = DateTime.now();
     var reminders = [Reminder(now), Reminder(now.add(Duration(days: 1)))];
-    TodoItem item = TodoItem("test name", now, completed: true, completedOn: now, dueDate: now, note: "test note", priority: TodoPriority.high, reminders: reminders);
+    TodoItem item = TodoItem("test name", now, completedOn: now, dueDate: now, note: "test note", priority: TodoPriority.high, reminders: reminders);
     var representation = todoItemToRepresentation(item);
     var resultItem = todoItemFromRepresentation(representation, reminders);
     expect(resultItem, item);
   });
 
+
+  test('item short representation test minimal', () async {
+    TodoItemShort item = TodoItemShort("test name", DateTime.now());
+    var representation = todoItemToRepresentation(item);
+    var resultItem = todoItemShortFromRepresentation(representation, 0);
+    expect(resultItem, item);
+  });
+
+  test('item short representation test full', () async {
+    var now = DateTime.now();
+    TodoItemShort item = TodoItemShort("test name", now, completedOn: now, dueDate: now, note: "test note", priority: TodoPriority.high, nActiveReminders: 5);
+    var representation = todoItemToRepresentation(item);
+    var resultItem = todoItemShortFromRepresentation(representation, 5);
+    expect(resultItem, item);
+  });
 
   test('item representation test id', () async {
     TodoItem item = TodoItem("test name", DateTime.now(), id: 8);
