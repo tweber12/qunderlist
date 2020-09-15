@@ -11,9 +11,9 @@ class TodoDetailsLoading extends TodoDetailsState {
   List<Object> get props => [];
 }
 
-class TodoDetailsLoadedItem extends TodoDetailsState {
-  final TodoItem item;
-  TodoDetailsLoadedItem(this.item);
+class TodoDetailsLoadedShortItem extends TodoDetailsState {
+  final TodoItemBase item;
+  TodoDetailsLoadedShortItem(this.item);
 
   @override
   List<Object> get props => [item];
@@ -21,9 +21,8 @@ class TodoDetailsLoadedItem extends TodoDetailsState {
 
 class TodoDetailsFullyLoaded extends TodoDetailsState {
   final TodoItem item;
-  final List<TodoList> lists;
-  TodoDetailsFullyLoaded(this.item, this.lists);
+  TodoDetailsFullyLoaded(this.item);
 
   @override
-  List<Object> get props => [item, ...lists];
+  List<Object> get props => [item];
 }

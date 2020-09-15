@@ -72,13 +72,14 @@ class TodoListItemDao {
     return firstIntValue(result);
   }
 
-  Future<List<TodoItem>> getTodoItemsOfListChunk(int listId, int start, int end, TodoStatusFilter filter) async {
+  Future<List<TodoItemShort>> getTodoItemsOfListChunk(int listId, int start, int end, TodoStatusFilter filter) async {
     var results = await _queryFilteredListItems(listId, filter, ordered: true);
-    var reminderMap = await reminderDao.getRemindersForItems(results.map((m) => m[ID] as int).toList());
+    var reminderMap = await reminderDao.countActiveRemindersForItems(results.map((m) => m[ID] as int).toList());
+    var now = DateTime.now();
     var items = results.map((result) {
       var id = result[ID];
-      var reminders = reminderMap[id] ?? List();
-      return todoItemFromRepresentation(result, reminders);
+      var nActiveReminders = reminderMap[id] ?? 0;
+      return todoItemShortFromRepresentation(result, nActiveReminders);
     }).toList();
     return items;
   }

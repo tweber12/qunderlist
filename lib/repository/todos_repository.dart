@@ -47,14 +47,16 @@ abstract class TodoRepository {
   Future<int> addReminder(int itemId, DateTime at);
   Future<void> updateReminder(int reminderId, DateTime at);
   Future<void> deleteReminder(int reminderId);
+  Future<List<Reminder>> getRemindersForItem(int itemId);
+  Future<List<Reminder>> getActiveRemindersForList(int listId);
 
   // Functions accessing items in lists
-  Future<int> addTodoItem(TodoItem item, int listId);
+  Future<TodoItem> addTodoItem(TodoItem item, {TodoList onList});
   Future<void> addTodoItemToList(int itemId, int listId);
   Future<void> removeTodoItemFromList(int itemId, int listId);
   Future<void> moveTodoItemToList(int itemId, int oldListId, int newListId);
   Future<void> moveTodoItemInList(int itemId, int listId, int moveToId);
   Future<int> getNumberOfTodoItems(int listId, TodoStatusFilter filter);
-  Future<List<TodoItem>> getTodoItemsOfListChunk(int listId, int start, int end, TodoStatusFilter filter);
+  Future<List<TodoItemShort>> getTodoItemsOfListChunk(int listId, int start, int end, TodoStatusFilter filter);
   Future<List<TodoList>> getListsOfItem(int itemId);
 }

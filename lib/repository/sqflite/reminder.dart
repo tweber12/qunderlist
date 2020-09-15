@@ -6,8 +6,8 @@ class ReminderDao {
   final Database _db;
   ReminderDao(this._db);
 
-  Future<int> addReminder(int itemId, DateTime at) {
-    return _db.insert(TODO_REMINDERS_TABLE, {TODO_REMINDER_ITEM: itemId, TODO_REMINDER_TIME: at.toIso8601String()});
+  Future<int> addReminder(int itemId, DateTime at, {DatabaseExecutor txn}) {
+    return (txn ?? _db).insert(TODO_REMINDERS_TABLE, {TODO_REMINDER_ITEM: itemId, TODO_REMINDER_TIME: at.toIso8601String()});
   }
 
   Future<void> updateReminder(int reminderId, DateTime at) {
@@ -18,11 +18,23 @@ class ReminderDao {
     return _db.delete(TODO_REMINDERS_TABLE, where: "ID = ?", whereArgs: [reminderId]);
   }
 
-  Future<List<Reminder>> getReminders(int itemId) async {
+  Future<List<Reminder>> getRemindersForItem(int itemId) async {
     var results = await _db.query(TODO_REMINDERS_TABLE,
         columns: [ID, TODO_REMINDER_TIME],
         where: "$TODO_REMINDER_ITEM = ?",
         whereArgs: [itemId]);
+    return results.map(reminderFromRepresentation).toList();
+  }
+
+  Future<List<Reminder>> getActiveRemindersForList(int listId) async {
+    var now = DateTime.now();
+    var results = await _db.rawQuery("""
+      select *
+        from $TODO_REMINDERS_TABLE
+             join $TODO_LIST_ITEMS_TABLE
+               on $TODO_LIST_ITEMS_ITEM = $TODO_REMINDER_ITEM
+       where $TODO_LIST_ITEMS_LIST = ? and $TODO_REMINDER_TIME > ?
+    """, [listId, now.toIso8601String()]);
     return results.map(reminderFromRepresentation).toList();
   }
 
@@ -50,6 +62,24 @@ class ReminderDao {
     }
     if (id != null) {
       reminders[id] = list;
+    }
+    return reminders;
+  }
+
+  Future<Map<int, int>> countActiveRemindersForItems(List<int> itemIds) async {
+    if (itemIds.isEmpty) {
+      return Map();
+    }
+    var now = DateTime.now().toIso8601String();
+    var results = await _db.query(TODO_REMINDERS_TABLE,
+        columns: [TODO_REMINDER_ITEM, "count(1)"],
+        where: "$TODO_REMINDER_ITEM in (${itemIds.join(",")}) and $TODO_REMINDER_TIME > ?",
+        groupBy: TODO_REMINDER_ITEM,
+        whereArgs: [now]);
+    Map<int, int> reminders = Map();
+    for (final result in results) {
+      var id = result[TODO_REMINDER_ITEM];
+      reminders[id] = result["count(1)"];
     }
     return reminders;
   }

@@ -95,11 +95,11 @@ class MoveToListEvent extends TodoDetailsEvent {
 }
 
 class CopyToListEvent extends TodoDetailsEvent {
-  final int listId;
-  CopyToListEvent(this.listId);
+  final TodoList list;
+  CopyToListEvent(this.list);
 
   @override
-  List<Object> get props => [listId];
+  List<Object> get props => [list];
 }
 
 class DeleteEvent extends TodoDetailsEvent {

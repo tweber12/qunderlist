@@ -186,7 +186,7 @@ class TodoListItemEmptyList extends StatelessWidget {
 }
 
 class TodoListItemList extends StatelessWidget {
-  final ListCache<TodoItem> items;
+  final ListCache<TodoItemShort> items;
   final bool reorderable;
   TodoListItemList(this.items, {this.reorderable=false});
 
@@ -216,7 +216,7 @@ class TodoListItemList extends StatelessWidget {
 
 class TodoListItemCard extends StatelessWidget {
   final int index;
-  final TodoItem item;
+  final TodoItemShort item;
 
   TodoListItemCard(this.index, this.item);
 
@@ -254,10 +254,10 @@ class TodoListItemCard extends StatelessWidget {
   static const TITLE_FONT_SIZE = 15.0;
   static const SUB_INFO_SIZE = 13.0;
   Widget _itemInfo(BuildContext context) {
-    if (item.note == null && item.dueDate == null && item.reminders.isEmpty) {
+    if (item.note == null && item.dueDate == null && item.nActiveReminders==0) {
       return Expanded(child: Text(item.todo, style: TextStyle(fontSize: TITLE_FONT_SIZE), maxLines: 2, overflow: TextOverflow.ellipsis));
     }
-    var numReminders = _activeReminders();
+    var numReminders = item.nActiveReminders;
     return Expanded(
         child: Column(
           children: [
@@ -278,17 +278,6 @@ class TodoListItemCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
         )
     );
-  }
-
-  int _activeReminders() {
-    var active = 0;
-    for (final reminder in item.reminders) {
-      var now = DateTime.now();
-      if (reminder.at.isAfter(now)) {
-        active += 1;
-      }
-    }
-    return active;
   }
 
   Color _dueDateColor(DateTime dueDate, DateTime completed) {

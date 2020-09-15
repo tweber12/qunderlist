@@ -30,7 +30,7 @@ class GetDataEvent extends TodoListEvent {
 }
 
 class NotifyItemUpdateEvent extends TodoListEvent {
-  final TodoItem item;
+  final TodoItemShort item;
   NotifyItemUpdateEvent(this.item);
 
   @override
@@ -55,7 +55,7 @@ class AddItemEvent extends TodoListEvent {
 }
 
 class DeleteItemEvent extends TodoListEvent {
-  final TodoItem item;
+  final TodoItemShort item;
   final int index;
 
   DeleteItemEvent(this.item, {this.index});
@@ -65,7 +65,7 @@ class DeleteItemEvent extends TodoListEvent {
 }
 
 class CompleteItemEvent extends TodoListEvent {
-  final TodoItem item;
+  final TodoItemShort item;
   final int index;
 
   CompleteItemEvent(this.item, {this.index});
@@ -75,7 +75,7 @@ class CompleteItemEvent extends TodoListEvent {
 }
 
 class UpdateItemPriorityEvent extends TodoListEvent {
-  final TodoItem item;
+  final TodoItemShort item;
   final int index;
   final TodoPriority priority;
 
@@ -86,9 +86,9 @@ class UpdateItemPriorityEvent extends TodoListEvent {
 }
 
 class ReorderItemsEvent extends TodoListEvent {
-  final TodoItem moveFrom;
+  final TodoItemShort moveFrom;
   final int moveFromIndex;
-  final TodoItem moveTo;
+  final TodoItemShort moveTo;
   final int moveToIndex;
 
   ReorderItemsEvent(this.moveFrom, this.moveFromIndex, this.moveTo, this.moveToIndex);

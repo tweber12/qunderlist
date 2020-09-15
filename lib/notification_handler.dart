@@ -11,35 +11,36 @@ Future<bool> setReminder(Reminder reminder) {
   SetReminder r = SetReminder()
     ..reminderId = reminder.id
     ..time = reminder.at.millisecondsSinceEpoch;
-  Api().setReminder(r);
+  return Api().setReminder(r);
 }
 
 Future<bool> cancelReminder(Reminder reminder) {
   var r = DeleteReminder()..reminderId=reminder.id;
-  Api().deleteReminder(r);
+  return Api().deleteReminder(r);
 }
 
-Future<List<bool>> setRemindersForItem(TodoItem item) {
-  return Future.wait(item.reminders.map(setReminder));
+Future<List<bool>> setRemindersForItem<R extends TodoRepository>(TodoItemBase item, R repository) async {
+  if (item is TodoItem) {
+    return Future.wait(item.reminders.map(setReminder));
+  } else {
+    var reminders = await repository.getRemindersForItem(item.id);
+    return Future.wait(reminders.map(setReminder));
+  }
 }
 
-Future<List<bool>> cancelRemindersForItem(TodoItem item) {
-  return Future.wait(item.reminders.map(cancelReminder));
+Future<List<bool>> cancelRemindersForItem<R extends TodoRepository>(TodoItemBase item, R repository) async {
+  if (item is TodoItem) {
+    return Future.wait(item.reminders.map(cancelReminder));
+  } else {
+    var reminders = await repository.getRemindersForItem(item.id);
+    return Future.wait(reminders.map(cancelReminder));
+  }
 }
 
 Future<void> cancelRemindersForList<R extends TodoRepository>(TodoList list, R repository) async {
-  var totalLength = await repository.getNumberOfTodoItems(list.id, TodoStatusFilter.active);
-  Future<List<TodoItem>> underlyingData(int start, int end) {
-    return repository.getTodoItemsOfListChunk(list.id, start, end, TodoStatusFilter.active);
-  }
-  var cache = ListCache(underlyingData, totalLength);
-  for (int i=0; i<totalLength; i++) {
-    var item = await cache.getItem(i);
-    var nLists = (await repository.getListsOfItem(item.id)).length;
-    if (nLists > 1) {
-      return;
-    }
-    cancelRemindersForItem(item);
+  var reminders = await repository.getActiveRemindersForList(list.id);
+  for (final reminder in reminders) {
+    cancelReminder(reminder);
   }
 }
 

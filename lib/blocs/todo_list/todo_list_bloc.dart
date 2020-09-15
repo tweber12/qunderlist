@@ -24,7 +24,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     _updateStream = _repository.updateStream.listen((_) => add(NotifyItemUpdateEvent(null)));
   }
 
-  ListCache<TodoItem> cache;
+  ListCache<TodoItemShort> cache;
   TodoStatusFilter filter;
   TodoListOrdering ordering;
 
@@ -75,10 +75,10 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   }
   Stream<TodoListStates> _mapAddItemEventToState(AddItemEvent event) async* {
     await _writeMutex.acquire();
-    var id = await _repository.addTodoItem(event.item, _list.id);
-    cache = cache.addElementAtEnd(event.item.copyWith(id: id));
+    var item = await _repository.addTodoItem(event.item, onList: _list);
+    cache = cache.addElementAtEnd(item.shorten());
     yield TodoListLoaded(_list, cache);
-    setRemindersForItem(event.item);
+    setRemindersForItem(event.item, _repository);
     _writeMutex.release();
   }
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
@@ -92,7 +92,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     } else {
       // No other lists contain this item, so delete it and all it's reminders
       await _repository.deleteTodoItem(event.item.id);
-      cancelRemindersForItem(event.item);
+      cancelRemindersForItem(event.item, _repository);
     }
     _writeMutex.release();
   }
@@ -105,10 +105,10 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     await _repository.updateTodoItem(newItem);
     if (newItem.completed) {
       // The event has been completed, so remove all notifications
-      cancelRemindersForItem(event.item);
+      cancelRemindersForItem(event.item, _repository);
     } else {
       // The event has been activated again, so activate all notifications as well
-      setRemindersForItem(event.item);
+      setRemindersForItem(event.item, _repository);
     }
     _writeMutex.release();
   }
@@ -156,7 +156,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     await _writeMutex.acquire();
     var filter = newFilter ?? this.filter;
     var totalLength = await _repository.getNumberOfTodoItems(_list.id, filter);
-    Future<List<TodoItem>> underlyingData(int start, int end) {
+    Future<List<TodoItemShort>> underlyingData(int start, int end) {
       return _repository.getTodoItemsOfListChunk(_list.id, start, end, filter);
     }
     var newCache = ListCache(underlyingData, totalLength);

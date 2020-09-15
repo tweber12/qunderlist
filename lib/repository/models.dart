@@ -67,9 +67,11 @@ class TodoItemShort extends TodoItemBase {
 
 class TodoItem extends TodoItemBase {
   final List<Reminder> reminders;
+  final List<TodoList> onLists;
 
-  TodoItem(String title, DateTime createdOn, {int id, DateTime completedOn, TodoPriority priority = TodoPriority.none, String note, DateTime dueDate, List<Reminder> reminders}):
+  TodoItem(String title, DateTime createdOn, {int id, DateTime completedOn, TodoPriority priority = TodoPriority.none, String note, DateTime dueDate, List<Reminder> reminders, List<TodoList> onLists}):
         this.reminders = reminders ?? [],
+        this.onLists = onLists ?? [],
         super(title, createdOn, id: id, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate);
 
   @override
@@ -81,7 +83,13 @@ class TodoItem extends TodoItemBase {
     return reminders.where((element) => element.at.isAfter(now)).length;
   }
 
-  TodoItem copyWith({int id, String todo, TodoPriority priority, DateTime createdOn, Nullable<String> note, Nullable<DateTime> dueDate, Nullable<DateTime> completedOn, List<Reminder> reminders}) {
+  TodoItemShort shorten() {
+    return TodoItemShort(
+      todo, createdOn, id: id, priority: priority, note: note, dueDate: dueDate, completedOn: completedOn, nActiveReminders: nActiveReminders
+    );
+  }
+
+  TodoItem copyWith({int id, String todo, TodoPriority priority, DateTime createdOn, Nullable<String> note, Nullable<DateTime> dueDate, Nullable<DateTime> completedOn, List<Reminder> reminders, List<TodoList> onLists}) {
     return TodoItem(
       todo ?? this.todo,
       createdOn ?? this.createdOn,
@@ -91,6 +99,7 @@ class TodoItem extends TodoItemBase {
       dueDate: dueDate?.value ?? this.dueDate,
       completedOn: completedOn?.value ?? this.completedOn,
       reminders: reminders ?? this.reminders,
+      onLists: onLists ?? this.onLists,
     );
   }
 

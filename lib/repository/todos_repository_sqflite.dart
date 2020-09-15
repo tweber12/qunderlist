@@ -70,13 +70,25 @@ class TodoRepositorySqflite extends TodoRepository {
   Future<List<TodoList>> getMatchingLists(String pattern, {int limit=5}) => listDao.getMatchingLists(pattern, limit);
 
   @override
-  Future<int> addTodoItem(TodoItem item, int listId) async {
+  Future<TodoItem> addTodoItem(TodoItem item, {TodoList onList}) async {
     var id;
     await _db.transaction((txn) async {
       id = await itemDao.addTodoItem(item, db: txn);
-      await listItemDao.addItemToList(id, listId, db: txn);
+      if (onList != null) {
+        await listItemDao.addItemToList(id, onList.id, db: txn);
+        item = item.copyWith(onLists: [onList]);
+      } else {
+        for (final listId in item.onLists) {
+          await listItemDao.addItemToList(id, listId.id, db: txn);
+        }
+      }
+      item = item.copyWith(id: id);
+      for (int i=0; i<item.reminders.length; i++) {
+        var rid = await reminderDao.addReminder(id, item.reminders[i].at, txn: txn);
+        item.reminders[i] = item.reminders[i].withId(rid);
+      }
     });
-    return id;
+    return item;
   }
 
   @override
@@ -98,6 +110,12 @@ class TodoRepositorySqflite extends TodoRepository {
   Future<void> deleteReminder(int reminderId) => reminderDao.deleteReminder(reminderId);
 
   @override
+  Future<List<Reminder>> getRemindersForItem(int itemId) => reminderDao.getRemindersForItem(itemId);
+
+  @override
+  Future<List<Reminder>> getActiveRemindersForList(int listId) => reminderDao.getActiveRemindersForList(listId);
+
+  @override
   Future<void> addTodoItemToList(int itemId, int listId) => listItemDao.addItemToList(itemId, listId);
 
   @override
@@ -113,7 +131,7 @@ class TodoRepositorySqflite extends TodoRepository {
   Future<int> getNumberOfTodoItems(int listId, TodoStatusFilter filter) => listItemDao.getNumberOfTodoItems(listId, filter);
 
   @override
-  Future<List<TodoItem>> getTodoItemsOfListChunk(int listId, int start, int end, TodoStatusFilter filter) => listItemDao.getTodoItemsOfListChunk(listId, start, end, filter);
+  Future<List<TodoItemShort>> getTodoItemsOfListChunk(int listId, int start, int end, TodoStatusFilter filter) => listItemDao.getTodoItemsOfListChunk(listId, start, end, filter);
 
   @override
   Future<List<TodoList>> getListsOfItem(int itemId) => listItemDao.getListsOfItem(itemId);

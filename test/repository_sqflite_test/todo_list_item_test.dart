@@ -14,7 +14,7 @@ void main() {
     Database db;
     TodoRepositorySqflite repository;
     List<TodoList> lists;
-    List<List<TodoItem>> items;
+    List<List<TodoItemShort>> items;
 
     setUp(() async {
       db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath,
@@ -33,6 +33,7 @@ void main() {
 
       // Add items to the first list
       items = List();
+      var fullItems = List();
       var items1 = List<TodoItem>();
       var now = DateTime.now();
       items1.add(TodoItem("first item", now));
@@ -47,7 +48,7 @@ void main() {
       items1.add(TodoItem("fourth item", now.add(Duration(days: 80)),
           priority: TodoPriority.medium, reminders: [Reminder(now.add(Duration(days: 25)))]
       ));
-      items.add(items1);
+      fullItems.add(items1);
 
       // Add items to the second list
       var items2 = List<TodoItem>();
@@ -67,23 +68,15 @@ void main() {
       items2.add(TodoItem("... or is it", now.add(Duration(days: 80)), note: "sneakily add another one\n\njust\nin\ncase",
           priority: TodoPriority.none
       ));
-      items.add(items2);
+      fullItems.add(items2);
 
       // Actually add the items and respective reminders
       for (int listIndex=0; listIndex<lists.length; listIndex++) {
-        for (int i = 0; i < items[listIndex].length; i++) {
-          var item = items[listIndex][i];
-          var id = await repository.addTodoItem(item, lists[listIndex].id);
-          item = item.copyWith(id: id);
-          if (item.reminders != null && item.reminders.isNotEmpty) {
-            for (int j = 0; j < item.reminders.length; j++) {
-              var reminder = item.reminders[j];
-              var id = await repository.addReminder(item.id, reminder.at);
-              reminder = reminder.withId(id);
-              item.reminders[j] = reminder;
-            }
-          }
-          items[listIndex][i] = item;
+        items.add(List());
+        for (int i = 0; i < fullItems[listIndex].length; i++) {
+          var item = fullItems[listIndex][i];
+          item = await repository.addTodoItem(item, onList: lists[listIndex]);
+          items[listIndex].add(item.shorten());
         }
       }
     });
@@ -260,7 +253,7 @@ void main() {
       expect(i1.isEmpty, true);
       // The item that is contained in another list is untouched
       var resultItem = await TodoItemDao(db).getTodoItem(item.id);
-      expect(resultItem, item);
+      expect(resultItem.shorten(), item);
       // All other items have been removed
       for (final i in items[0]) {
         if (i.id != item.id) {
@@ -297,7 +290,7 @@ void main() {
     Database db;
     TodoRepositorySqflite repository;
     int listId;
-    List<TodoItem> items;
+    List<TodoItemShort> items;
 
     setUp(() async {
       db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath,
@@ -312,27 +305,28 @@ void main() {
 
       // Add items to the first list
       items = List();
+      var fullItems = List();
       var now = DateTime.now();
-      items.add(TodoItem("first item", now, completedOn: now.add(Duration(hours: 5))));
-      items.add(TodoItem("first item", now, priority: TodoPriority.low, dueDate: now.add(Duration(hours: 5))));
-      items.add(TodoItem("second item", now, completedOn: now.add(Duration(hours: 4))));
-      items.add(TodoItem("second item", now, priority: TodoPriority.high, dueDate: now.add(Duration(hours: 4))));
-      items.add(TodoItem("third item", now, priority: TodoPriority.none, dueDate: now.add(Duration(hours: 2))));
-      items.add(TodoItem("third item", now, completedOn: now.add(Duration(hours: 2))));
-      items.add(TodoItem("fourth item", now, completedOn: now.add(Duration(hours: 18))));
-      items.add(TodoItem("fourth item", now, priority: TodoPriority.medium, dueDate: now.add(Duration(hours: 18))));
-      items.add(TodoItem("fifth item", now, priority: TodoPriority.high, dueDate: now.add(Duration(hours: 29))));
-      items.add(TodoItem("fifth item", now, completedOn: now.add(Duration(hours: 29))));
-      items.add(TodoItem("sixth item", now, priority: TodoPriority.low, dueDate: now.add(Duration(hours: 1))));
-      items.add(TodoItem("sixth item", now, completedOn: now.add(Duration(hours: 1))));
+      fullItems.add(TodoItem("first item", now, completedOn: now.add(Duration(hours: 5))));
+      fullItems.add(TodoItem("first item", now, priority: TodoPriority.low, dueDate: now.add(Duration(hours: 5))));
+      fullItems.add(TodoItem("second item", now, completedOn: now.add(Duration(hours: 4))));
+      fullItems.add(TodoItem("second item", now, priority: TodoPriority.high, dueDate: now.add(Duration(hours: 4))));
+      fullItems.add(TodoItem("third item", now, priority: TodoPriority.none, dueDate: now.add(Duration(hours: 2))));
+      fullItems.add(TodoItem("third item", now, completedOn: now.add(Duration(hours: 2))));
+      fullItems.add(TodoItem("fourth item", now, completedOn: now.add(Duration(hours: 18))));
+      fullItems.add(TodoItem("fourth item", now, priority: TodoPriority.medium, dueDate: now.add(Duration(hours: 18))));
+      fullItems.add(TodoItem("fifth item", now, priority: TodoPriority.high, dueDate: now.add(Duration(hours: 29))));
+      fullItems.add(TodoItem("fifth item", now, completedOn: now.add(Duration(hours: 29))));
+      fullItems.add(TodoItem("sixth item", now, priority: TodoPriority.low, dueDate: now.add(Duration(hours: 1))));
+      fullItems.add(TodoItem("sixth item", now, completedOn: now.add(Duration(hours: 1))));
 
       // Actually add the items and respective reminders
-      for (int i = 0; i < items.length; i++) {
-        var item = items[i];
+      for (int i = 0; i < fullItems.length; i++) {
+        var item = fullItems[i];
         var id = await itemDao.addTodoItem(item);
         repository.addTodoItemToList(id, listId);
         item = item.copyWith(id: id);
-        items[i] = item;
+        items.add(item.shorten());
       }
     });
     tearDown(() async {

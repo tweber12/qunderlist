@@ -11,7 +11,7 @@ import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
 import 'package:qunderlist/widgets/sliver_header.dart';
 
-Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItem initialItem, TodoListBloc todoListBloc}) {
+Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItemBase initialItem, TodoListBloc todoListBloc}) {
   assert(itemId != null || initialItem != null);
   return RepositoryProvider.value(
       value: repository,
@@ -44,8 +44,8 @@ class TodoItemDetailScreen extends StatelessWidget {
             body: LinearProgressIndicator(),
           );
         }
-        TodoItem item;
-        if (state is TodoDetailsLoadedItem) {
+        TodoItemBase item;
+        if (state is TodoDetailsLoadedShortItem) {
           item = state.item;
         } else if (state is TodoDetailsFullyLoaded) {
           item = state.item;
@@ -69,14 +69,14 @@ class TodoItemDetailScreen extends StatelessWidget {
                       PriorityTile(item.priority, (priority) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdatePriorityEvent(priority))),
                       Divider(),
                       DueDateTile((date) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateDueDateEvent(date)), initialDate: item.dueDate),
-                      ReminderTile(
+                      item is TodoItem ? ReminderTile(
                         item.reminders,
                         (date) => BlocProvider.of<TodoDetailsBloc>(context).add(AddReminderEvent(Reminder(date))),
                         (reminder) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateReminderEvent(reminder)),
                         (reminder) => BlocProvider.of<TodoDetailsBloc>(context).add(DeleteReminderEvent(reminder)),
                         allowUndo: true,
                         startDate: item.dueDate,
-                      ),
+                      ) : CircularProgressIndicator(),
 //                      TodoItemDetailsReminders(item.reminders),
                       Divider(),
                       TodoItemDetailsNotes(item.note),
@@ -96,7 +96,7 @@ class TodoItemDetailsLists extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     print("REPAINT");
-    if (state is TodoDetailsLoadedItem || state is TodoDetailsLoading) {
+    if (state is TodoDetailsLoadedShortItem || state is TodoDetailsLoading) {
       return SizedBox(
         height: height,
         child: Center(child: CircularProgressIndicator()),
@@ -104,7 +104,7 @@ class TodoItemDetailsLists extends StatelessWidget {
     } else {
       List<TodoList> lists;
       if (state is TodoDetailsFullyLoaded) {
-        lists = (state as TodoDetailsFullyLoaded).lists;
+        lists = (state as TodoDetailsFullyLoaded).item.onLists;
       }
       return ListTile(
         leading: Icon(Icons.playlist_add),
@@ -159,7 +159,7 @@ Future<void> _addToList(BuildContext context, List<TodoList> onLists, {TodoList 
     if (move) {
       BlocProvider.of<TodoDetailsBloc>(context).add(MoveToListEvent(moveFromList.id, list));
     } else if (copy) {
-      BlocProvider.of<TodoDetailsBloc>(context).add(CopyToListEvent(list.id));
+      BlocProvider.of<TodoDetailsBloc>(context).add(CopyToListEvent(list));
     } else {
       BlocProvider.of<TodoDetailsBloc>(context).add(AddToListEvent(list));
     }
@@ -366,7 +366,7 @@ class _TodoItemDetailsNotesDialogState extends State<TodoItemDetailsNotesDialog>
 }
 
 class InfoButton extends StatelessWidget {
-  final TodoItem item;
+  final TodoItemBase item;
   InfoButton(this.item);
 
   @override
@@ -406,7 +406,7 @@ enum ExtraActions {
 }
 
 class ExtraActionsButton extends StatelessWidget {
-  final TodoItem item;
+  final TodoItemBase item;
   ExtraActionsButton(this.item);
 
   @override

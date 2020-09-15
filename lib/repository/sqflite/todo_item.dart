@@ -26,7 +26,7 @@ class TodoItemDao {
     if (results.isEmpty) {
       return null;
     }
-    var reminders = await _reminders.getReminders(itemId);
+    var reminders = await _reminders.getRemindersForItem(itemId);
     var todoItem = todoItemFromRepresentation(results.first, reminders);
     return todoItem;
   }

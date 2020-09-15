@@ -22,7 +22,7 @@ class TodoListLoadingFailed extends TodoListStates {
 
 class TodoListLoaded extends TodoListStates {
   final TodoList list;
-  final ListCache<TodoItem> items;
+  final ListCache<TodoItemShort> items;
 
   TodoListLoaded(this.list, this.items);
 

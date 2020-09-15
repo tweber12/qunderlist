@@ -30,8 +30,13 @@ void main() {
     var s = 2;
     for (final itemId in itemIds) {
       var r = List<Reminder>();
+      var date;
       for (int i=0; i<s; i++) {
-        var date = now.add(Duration(days: i));
+        if (i%2==0) {
+          date = now.add(Duration(days: i+1));
+        } else {
+          date = now.subtract(Duration(days: i+1));
+        }
         var id = await repository.addReminder(itemId, date);
         r.add(Reminder(date, id: id));
       }
@@ -48,7 +53,7 @@ void main() {
 
   test('get reminders test', () async {
     for (final itemId in itemIds) {
-      var resultReminders = await dao.getReminders(itemId);
+      var resultReminders = await repository.getRemindersForItem(itemId);
       resultReminders.sort((a,b) => a.id.compareTo(b.id));
       expect(resultReminders, reminders[itemId]);
     }
@@ -69,6 +74,17 @@ void main() {
     for (final itemId in resultReminders.keys) {
       resultReminders[itemId].sort((a,b) => a.id.compareTo(b.id));
       expect(resultReminders[itemId], reminders[itemId]);
+    }
+  });
+
+
+  test('count active reminders for items all test', () async {
+    var resultReminders = await dao.countActiveRemindersForItems(itemIds);
+    expect(resultReminders.length, itemIds.length);
+    var now = DateTime.now();
+    for (final itemId in itemIds) {
+      var expected = reminders[itemId].where((element) => element.at.isAfter(now)).length;
+      expect(resultReminders[itemId], expected);
     }
   });
 
@@ -111,7 +127,7 @@ void main() {
       expect(resultReminders[itemId], reminders[itemId]);
     }
     expect(resultReminders[delId], null);
-    var resultDeleted = await dao.getReminders(delId);
+    var resultDeleted = await repository.getRemindersForItem(delId);
     expect(resultDeleted, []);
   });
 
@@ -125,6 +141,21 @@ void main() {
     for (final itemId in resultReminders.keys) {
       resultReminders[itemId].sort((a,b) => a.id.compareTo(b.id));
       expect(resultReminders[itemId], reminders[itemId]);
+    }
+  });
+
+  test("get reminders for list", () async {
+    var itemId1 = itemIds[0];
+    var itemId2 = itemIds[2];
+    int listId = await repository.addTodoList(TodoList("test", Palette.amber));
+    repository.addTodoItemToList(itemId1, listId);
+    repository.addTodoItemToList(itemId2, listId);
+    var now = DateTime.now();
+    var resultReminders = await repository.getActiveRemindersForList(listId);
+    var active = (reminders[itemId1]+reminders[itemId2]).where((element) => element.at.isAfter(now)).toList();
+    expect(resultReminders.length, active.length);
+    for (final item in active) {
+      expect(resultReminders.contains(item), true);
     }
   });
 }
