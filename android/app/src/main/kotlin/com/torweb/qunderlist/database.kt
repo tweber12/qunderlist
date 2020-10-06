@@ -7,6 +7,31 @@ import android.database.sqlite.SQLiteOpenHelper
 import java.text.SimpleDateFormat
 import java.util.*
 
+const val ID = "id"
+
+//const val TODO_LISTS_TABLE = "todo_lists"
+//const val TODO_LIST_NAME = "list_name"
+//const val TODO_LIST_COLOR = "list_color"
+//const val TODO_LIST_ORDERING = "list_ordering"
+
+const val TODO_ITEMS_TABLE = "todo_items"
+const val TODO_ITEM_NAME = "item_name"
+//const val TODO_ITEM_PRIORITY = "item_priority"
+const val TODO_ITEM_NOTE = "item_note"
+//const val TODO_ITEM_DUE_DATE = "item_due"
+//const val TODO_ITEM_REPEAT = "item_repeat"
+//const val TODO_ITEM_CREATED_DATE = "item_created_date"
+const val TODO_ITEM_COMPLETED_DATE = "item_completed_date"
+
+//const val TODO_LIST_ITEMS_TABLE = "todo_list_items"
+//const val TODO_LIST_ITEMS_LIST = "list_items_list"
+//const val TODO_LIST_ITEMS_ITEM = "list_items_item"
+//const val TODO_LIST_ITEMS_ORDERING = "list_items_ordering"
+
+const val TODO_REMINDERS_TABLE = "todo_reminders"
+const val TODO_REMINDER_ITEM = "reminder_item"
+const val TODO_REMINDER_TIME = "reminder_time"
+
 class DbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
     override fun onCreate(db: SQLiteDatabase) {
         TODO("Throw a proper error. This should never happen!")
@@ -46,13 +71,14 @@ class Database(context: Context) {
     companion object {
         var dbHelper: DbHelper?= null
         var db: SQLiteDatabase? = null
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US)
     }
 
     fun getItem(reminderId: Long): ItemDescription {
         val cursorReminders = db?.query(
-                "todo_reminders",
-                arrayOf("reminder_item"),
-                "id = ?",
+                TODO_REMINDERS_TABLE,
+                arrayOf(TODO_REMINDER_ITEM),
+                "$ID = ?",
                 arrayOf(reminderId.toString()),
                 null,
                 null,
@@ -62,9 +88,9 @@ class Database(context: Context) {
         val itemId = cursorReminders.getLong(0)
         cursorReminders.close()
         val cursor = db?.query(
-                "todo_items",
-                arrayOf("item_name", "item_note"),
-                "id = ?",
+                TODO_ITEMS_TABLE,
+                arrayOf(TODO_ITEM_NAME, TODO_ITEM_NOTE),
+                "$ID = ?",
                 arrayOf(itemId.toString()),
                 null,
                 null,
@@ -78,56 +104,54 @@ class Database(context: Context) {
     }
 
     fun completeItem(itemId: Long) {
-        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US);
         val time = Date()
         val content = ContentValues()
-        val iso8601 = format.format(time);
-        content.put("item_completed_date", iso8601)
+        val iso8601 = dateFormat.format(time)
+        content.put(TODO_ITEM_COMPLETED_DATE, iso8601)
         db?.update(
-                "todo_items",
+                TODO_ITEMS_TABLE,
                 content,
-                "id = ?",
+                "$ID = ?",
                 arrayOf(itemId.toString())
         )
     }
 
     fun snoozeItem(reminderId: Long): Long {
-        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US);
         val snoozed = Calendar.getInstance()
         snoozed.isLenient = true
         snoozed.add(Calendar.HOUR, 1)
         val time = Date(snoozed.timeInMillis)
         val content = ContentValues()
-        val iso8601 = format.format(time);
-        content.put("reminder_time", iso8601)
+        val iso8601 = dateFormat.format(time)
+        content.put(TODO_REMINDER_TIME, iso8601)
         db?.update(
-                "todo_reminders",
+                TODO_REMINDERS_TABLE,
                 content,
-                "id = ?",
+                "$ID = ?",
                 arrayOf(reminderId.toString())
         )
         return snoozed.timeInMillis
     }
 
     fun getActiveReminders(): List<Reminder> {
-        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", Locale.US);
-        val now = format.format(Date());
+        val now = dateFormat.format(Date())
         val cursorReminders = db!!.query(
-                "todo_reminders",
-                arrayOf("id", "reminder_time"),
-                "reminder_time >= ?",
+                TODO_REMINDERS_TABLE,
+                arrayOf(ID, TODO_REMINDER_TIME),
+                "$TODO_REMINDER_TIME >= ?",
                 arrayOf(now),
                 null,
                 null,
                 null
         )
-        var list = mutableListOf<Reminder>()
+        val list = mutableListOf<Reminder>()
         while (cursorReminders.moveToNext()) {
             val id = cursorReminders.getLong(0)
             val iso8601 = cursorReminders.getString(1)
-            val time = format.parse(iso8601).time;
+            val time = dateFormat.parse(iso8601).time
             list.add(Reminder(id, time))
         }
+        cursorReminders.close()
         return list
     }
 }
