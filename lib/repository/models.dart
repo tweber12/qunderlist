@@ -28,6 +28,12 @@ abstract class TodoItemBase with Cacheable, EquatableMixin {
 
   @override
   int get cacheId => id;
+
+  TodoItemShort shorten() {
+    return TodoItemShort(
+        todo, createdOn, id: id, priority: priority, note: note, dueDate: dueDate, completedOn: completedOn, nActiveReminders: nActiveReminders
+    );
+  }
 }
 
 class TodoItemShort extends TodoItemBase {
@@ -49,9 +55,9 @@ class TodoItemShort extends TodoItemBase {
       createdOn ?? this.createdOn,
       id: id ?? this.id,
       priority: priority ?? this.priority,
-      note: note?.value ?? this.note,
-      dueDate: dueDate?.value ?? this.dueDate,
-      completedOn: completedOn?.value ?? this.completedOn,
+      note: copyNullable(note, this.note),
+      dueDate: copyNullable(dueDate, this.dueDate),
+      completedOn: copyNullable(completedOn, this.completedOn),
       nActiveReminders: nActiveReminders ?? _nActiveReminders,
     );
   }
@@ -62,6 +68,11 @@ class TodoItemShort extends TodoItemBase {
     } else {
       return copyWith(completedOn: Nullable(DateTime.now()));
     }
+  }
+
+  @override
+  TodoItemShort shorten() {
+    return this;
   }
 }
 
@@ -83,21 +94,15 @@ class TodoItem extends TodoItemBase {
     return reminders.where((element) => element.at.isAfter(now)).length;
   }
 
-  TodoItemShort shorten() {
-    return TodoItemShort(
-      todo, createdOn, id: id, priority: priority, note: note, dueDate: dueDate, completedOn: completedOn, nActiveReminders: nActiveReminders
-    );
-  }
-
   TodoItem copyWith({int id, String todo, TodoPriority priority, DateTime createdOn, Nullable<String> note, Nullable<DateTime> dueDate, Nullable<DateTime> completedOn, List<Reminder> reminders, List<TodoList> onLists}) {
     return TodoItem(
       todo ?? this.todo,
       createdOn ?? this.createdOn,
       id: id ?? this.id,
       priority: priority ?? this.priority,
-      note: note?.value ?? this.note,
-      dueDate: dueDate?.value ?? this.dueDate,
-      completedOn: completedOn?.value ?? this.completedOn,
+      note: copyNullable(note, this.note),
+      dueDate: copyNullable(dueDate, this.dueDate),
+      completedOn: copyNullable(completedOn, this.completedOn),
       reminders: reminders ?? this.reminders,
       onLists: onLists ?? this.onLists,
     );
@@ -112,12 +117,19 @@ class TodoItem extends TodoItemBase {
   }
 
   @override
-  List<Object> get props => [...super.props, ...reminders];
+  List<Object> get props => [...super.props, ...reminders, onLists];
 }
 
 class Nullable<T> {
   final T value;
   Nullable(this.value);
+}
+T copyNullable<T>(Nullable<T> newValue, T oldValue) {
+  if (newValue == null) {
+    return oldValue;
+  } else {
+    return newValue.value;
+  }
 }
 
 enum TodoStatusFilter {
