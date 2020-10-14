@@ -74,6 +74,8 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
       yield* _mapUpdateNoteEventToState(event);
     } else if (event is UpdateDueDateEvent) {
       yield* _mapUpdateDueDateEventToState(event);
+    } else if (event is UpdateRepeatedEvent) {
+      yield* _mapUpdateRepeatedEventToState(event);
     } else if (event is AddReminderEvent) {
       yield* _mapAddReminderEventToState(event);
     } else if (event is UpdateReminderEvent) {
@@ -152,10 +154,34 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
 
   Stream<TodoDetailsState> _mapUpdateDueDateEventToState(UpdateDueDateEvent event) async* {
     await _writeMutex.acquire();
-    _fullItem = _fullItem.copyWith(dueDate: Nullable(event.newDueDate));
+    if (event.newDueDate == null) {
+      _fullItem = _fullItem.copyWith(dueDate: Nullable(event.newDueDate), repeated: Nullable(null));
+    } else {
+      _fullItem = _fullItem.copyWith(dueDate: Nullable(event.newDueDate), repeated: Nullable(_fullItem.repeated?.copyWith(active: true)));
+    }
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
+    await _repository.updateRepeated(_fullItem.id, _fullItem.repeated);
+    _writeMutex.release();
+  }
+
+  Stream<TodoDetailsState> _mapUpdateRepeatedEventToState(UpdateRepeatedEvent event) async* {
+    await _writeMutex.acquire();
+    var dueDate;
+    if (event.repeated != null && _fullItem.dueDate == null) {
+      var now = DateTime.now();
+      dueDate = DateTime(now.year, now.month, now.day);
+      _fullItem = _fullItem.copyWith(dueDate: Nullable(dueDate), repeated: Nullable(event.repeated));
+    } else {
+      _fullItem = _fullItem.copyWith(repeated: Nullable(event.repeated));
+    }
+    yield TodoDetailsFullyLoaded(_fullItem);
+    _notifyList();
+    if (dueDate != null) {
+      await _repository.updateTodoItem(_fullItem);
+    }
+    await _repository.updateRepeated(_fullItem.id, _fullItem.repeated);
     _writeMutex.release();
   }
 

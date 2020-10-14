@@ -39,11 +39,13 @@ void main() {
       items1.add(TodoItem("first item", now));
       items1.add(TodoItem("second item", now.add(Duration(hours: 1)),
           note: "note for second item", completedOn: now.subtract(Duration(minutes: 1)),
-          dueDate: now.add(Duration(days: 1)), priority: TodoPriority.high, reminders: [Reminder(now), Reminder(now.add(Duration(minutes: 5)))]
+          dueDate: now.add(Duration(days: 1)), priority: TodoPriority.high, reminders: [Reminder(now), Reminder(now.add(Duration(minutes: 5)))],
+          repeated: Repeated(true, false, true, false, RepeatedStepYearly(1, 8, 31))
       ));
       items1.add(TodoItem("third item", now.add(Duration(hours: 5)),
         note: "a longer\nnote for the third item\ninthislist",
         dueDate: now.add(Duration(days: 10)), priority: TodoPriority.low,
+        repeated: Repeated(false, true, true, false, RepeatedStepDaily(3))
       ));
       items1.add(TodoItem("fourth item", now.add(Duration(days: 80)),
           priority: TodoPriority.medium, reminders: [Reminder(now.add(Duration(days: 25)))]
@@ -57,6 +59,7 @@ void main() {
       items2.add(TodoItem("second list, second item", now.add(Duration(hours: 5)),
         note: "a longer\nnote for this item\ninthesecondlist",
         dueDate: now.add(Duration(days: 10)), priority: TodoPriority.low,
+        repeated: Repeated(true, false, false, true, RepeatedStepMonthly(9, 1))
       ));
       items2.add(TodoItem("third item, second list", now.add(Duration(hours: 1)),
           note: "note for the third item on the second list", completedOn: now.subtract(Duration(minutes: 1)),
@@ -66,7 +69,8 @@ void main() {
           priority: TodoPriority.medium, reminders: [Reminder(now.add(Duration(days: 25)))]
       ));
       items2.add(TodoItem("... or is it", now.add(Duration(days: 80)), note: "sneakily add another one\n\njust\nin\ncase",
-          priority: TodoPriority.none
+          priority: TodoPriority.none,
+          repeated: Repeated(false, true, false, false, RepeatedStepWeekly(2))
       ));
       fullItems.add(items2);
 

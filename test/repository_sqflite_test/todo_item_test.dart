@@ -32,12 +32,12 @@ void main() {
     items.add(TodoItem("second item", now.add(Duration(hours: 1)),
         note: "note for second item", completedOn: now.subtract(Duration(minutes: 1)),
         dueDate: now.add(Duration(days: 1)), priority: TodoPriority.high, reminders: [Reminder(now), Reminder(now.add(Duration(minutes: 5)))],
-        onLists: [lists[1]]
+        onLists: [lists[1]], repeated: Repeated(true, false, false, true, RepeatedStepDaily(1))
     ));
     items.add(TodoItem("third item", now.add(Duration(hours: 5)),
       note: "a longer\nnote for the third item\ninthislist",
       dueDate: now.add(Duration(days: 10)), priority: TodoPriority.low,
-      onLists: [lists[1],lists[2]]
+      onLists: [lists[1],lists[2]], repeated: Repeated(false, false, false, true, RepeatedStepYearly(2,8,19))
     ));
     items.add(TodoItem("fourth item", now.add(Duration(days: 80)),
       priority: TodoPriority.medium, reminders: [Reminder(now.add(Duration(days: 25)))],
@@ -112,10 +112,9 @@ void main() {
       var resultItem = await repository.getTodoItem(item.id);
       expect(resultItem, item);
     }
-    // Reminders and lists are not affected by the update
-    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists));
+    // Reminders, repeat and lists are not affected by the update
+    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists, repeated: Nullable(items[1].repeated)));
   });
-
 
   test('update short item test', () async {
     var updateId = items[1].id;
@@ -125,7 +124,7 @@ void main() {
       var resultItem = await repository.getTodoItem(item.id);
       expect(resultItem, item);
     }
-    // Reminders and lists are not affected by the update
-    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists));
+    // Reminders, repeat and lists are not affected by the update
+    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists, repeated: Nullable(items[1].repeated)));
   });
 }

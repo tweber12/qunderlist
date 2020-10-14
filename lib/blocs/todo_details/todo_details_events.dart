@@ -42,6 +42,15 @@ class UpdateDueDateEvent extends TodoDetailsEvent {
   @override
   List<Object> get props => [newDueDate];
 }
+
+class UpdateRepeatedEvent extends TodoDetailsEvent {
+  final Repeated repeated;
+  UpdateRepeatedEvent(this.repeated);
+
+  @override
+  List<Object> get props => [repeated];
+}
+
 class AddReminderEvent extends TodoDetailsEvent {
   final Reminder reminder;
   AddReminderEvent(this.reminder);

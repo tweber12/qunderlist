@@ -9,6 +9,7 @@ import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/theme.dart';
 import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
+import 'package:qunderlist/widgets/repeated.dart';
 import 'package:qunderlist/widgets/sliver_header.dart';
 
 Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItemBase initialItem, TodoListBloc todoListBloc}) {
@@ -69,6 +70,11 @@ class TodoItemDetailScreen extends StatelessWidget {
                       PriorityTile(item.priority, (priority) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdatePriorityEvent(priority))),
                       Divider(),
                       DueDateTile((date) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateDueDateEvent(date)), initialDate: item.dueDate),
+                      item is TodoItem ? RepeatedTile(
+                        onRepeatedChanged: (repeated) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateRepeatedEvent(repeated)),
+                        repeated: item.repeated,
+                        dueDate: item.dueDate,
+                      ) : CircularProgressIndicator(),
                       item is TodoItem ? ReminderTile(
                         item.reminders,
                         (date) => BlocProvider.of<TodoDetailsBloc>(context).add(AddReminderEvent(Reminder(date))),

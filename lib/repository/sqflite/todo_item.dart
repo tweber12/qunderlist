@@ -9,12 +9,19 @@ class TodoItemDao {
   TodoItemDao(this._db): _reminders = ReminderDao(_db);
 
   Future<int> addTodoItem(TodoItem item, {DatabaseExecutor db}) async {
-       return await (db ?? _db).insert(TODO_ITEMS_TABLE, todoItemToRepresentation(item));
+    var repository = todoItemToRepresentation(item);
+    repository.addAll(repeatedToRepresentation(item.repeated));
+    return await (db ?? _db).insert(TODO_ITEMS_TABLE, repository);
   }
 
   Future<void> updateTodoItem(TodoItemBase item) async {
     await _db.update(TODO_ITEMS_TABLE, todoItemToRepresentation(item),
         where: "$ID = ?", whereArgs: [item.id]);
+  }
+
+  Future<void> updateRepeated(int itemId, Repeated repeated) async {
+    await _db.update(TODO_ITEMS_TABLE, repeatedToRepresentation(repeated),
+        where: "$ID = ?", whereArgs: [itemId]);
   }
 
   Future<void> deleteTodoItem(int itemId) async {

@@ -96,6 +96,9 @@ class TodoRepositorySqflite extends TodoRepository {
   Future<void> updateTodoItem(TodoItemBase item) => itemDao.updateTodoItem(item);
 
   @override
+  Future<void> updateRepeated(int itemId, Repeated repeated) => itemDao.updateRepeated(itemId, repeated);
+
+  @override
   Future<void> deleteTodoItem(int itemId) => itemDao.deleteTodoItem(itemId);
 
   @override

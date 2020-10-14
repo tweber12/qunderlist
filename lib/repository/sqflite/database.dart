@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:qunderlist/repository/models.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -13,9 +15,13 @@ const String TODO_ITEM_NAME = "item_name";
 const String TODO_ITEM_PRIORITY = "item_priority";
 const String TODO_ITEM_NOTE = "item_note";
 const String TODO_ITEM_DUE_DATE = "item_due";
-const String TODO_ITEM_REPEAT = "item_repeat";
 const String TODO_ITEM_CREATED_DATE = "item_created_date";
 const String TODO_ITEM_COMPLETED_DATE = "item_completed_date";
+const String TODO_ITEM_REPEAT_ACTIVE = "item_repeat_active";
+const String TODO_ITEM_REPEAT_AUTO_ADVANCE = "item_repeat_auto_advance";
+const String TODO_ITEM_REPEAT_AUTO_COMPLETE = "item_repeat_auto_complete";
+const String TODO_ITEM_REPEAT_KEEP_HISTORY = "item_repeat_keep_history";
+const String TODO_ITEM_REPEAT_STEP = "item_repeat_step";
 
 const String TODO_LIST_ITEMS_TABLE = "todo_list_items";
 const String TODO_LIST_ITEMS_LIST = "list_items_list";
@@ -49,9 +55,13 @@ Future<void> createDatabase(Database db, int version) async {
         $TODO_ITEM_PRIORITY tinyint,
         $TODO_ITEM_NOTE text,
         $TODO_ITEM_DUE_DATE text,
-        $TODO_ITEM_REPEAT text,
         $TODO_ITEM_CREATED_DATE text,
-        $TODO_ITEM_COMPLETED_DATE text
+        $TODO_ITEM_COMPLETED_DATE text,
+        $TODO_ITEM_REPEAT_ACTIVE tinyint,
+        $TODO_ITEM_REPEAT_AUTO_ADVANCE tinyint,
+        $TODO_ITEM_REPEAT_AUTO_COMPLETE tinyint,
+        $TODO_ITEM_REPEAT_KEEP_HISTORY tinyint,
+        $TODO_ITEM_REPEAT_STEP text
       );
     """);
     txn.execute("""
@@ -142,6 +152,7 @@ TodoItemShort todoItemShortFromRepresentation(
         ? null
         : DateTime.parse(representation[TODO_ITEM_COMPLETED_DATE]),
     nActiveReminders: nActiveReminders,
+    repeatedStatus: repeatedStatusFromRepresentation(representation),
   );
 }
 
@@ -161,7 +172,85 @@ TodoItem todoItemFromRepresentation(
         : DateTime.parse(representation[TODO_ITEM_COMPLETED_DATE]),
     reminders: reminders,
     onLists: onLists,
+    repeated: repeatedFromRepresentation(representation),
   );
+}
+
+Map<String, dynamic> repeatedToRepresentation(Repeated repeated) {
+  if (repeated == null) {
+    return {
+      TODO_ITEM_REPEAT_ACTIVE: null,
+      TODO_ITEM_REPEAT_AUTO_ADVANCE: null,
+      TODO_ITEM_REPEAT_AUTO_COMPLETE: null,
+      TODO_ITEM_REPEAT_KEEP_HISTORY: null,
+      TODO_ITEM_REPEAT_STEP: null,
+    };
+  }
+  return {
+    TODO_ITEM_REPEAT_ACTIVE: boolToRepresentation(repeated.active),
+    TODO_ITEM_REPEAT_AUTO_ADVANCE: boolToRepresentation(repeated.autoAdvance),
+    TODO_ITEM_REPEAT_AUTO_COMPLETE: boolToRepresentation(repeated.autoComplete),
+    TODO_ITEM_REPEAT_KEEP_HISTORY: boolToRepresentation(repeated.keepHistory),
+    TODO_ITEM_REPEAT_STEP: repeatedStepToRepresentation(repeated.step),
+  };
+}
+
+Repeated repeatedFromRepresentation(Map<String, dynamic> representation) {
+  if (representation[TODO_ITEM_REPEAT_ACTIVE] == null) {
+    return null;
+  }
+  return Repeated(
+    boolFromRepresentation(representation[TODO_ITEM_REPEAT_ACTIVE]),
+    boolFromRepresentation(representation[TODO_ITEM_REPEAT_AUTO_ADVANCE]),
+    boolFromRepresentation(representation[TODO_ITEM_REPEAT_AUTO_COMPLETE]),
+    boolFromRepresentation(representation[TODO_ITEM_REPEAT_KEEP_HISTORY]),
+    repeatedStepFromRepresentation(representation[TODO_ITEM_REPEAT_STEP]),
+  );
+}
+
+RepeatedStatus repeatedStatusFromRepresentation(Map<String,dynamic> representation) {
+  var active = representation[TODO_ITEM_REPEAT_ACTIVE];
+  if (active == null) {
+    return RepeatedStatus.none;
+  } else {
+    return boolFromRepresentation(active) ? RepeatedStatus.active : RepeatedStatus.inactive;
+  }
+}
+
+const String REPEATED_STEP_SIZE = "step_size";
+const String REPEATED_AMOUNT = "amount";
+const String REPEATED_ON_DAY = "day";
+const String REPEATED_ON_MONTH = "month";
+
+const int REPEATED_STEP_DAILY = 1;
+const int REPEATED_STEP_WEEKLY = 2;
+const int REPEATED_STEP_MONTHLY = 3;
+const int REPEATED_STEP_YEARLY = 4;
+
+RepeatedStep repeatedStepFromRepresentation(String representation) {
+  var map = jsonDecode(representation) as Map<String, dynamic>;
+  var amount = map[REPEATED_AMOUNT];
+  switch (map[REPEATED_STEP_SIZE]) {
+    case REPEATED_STEP_DAILY: return RepeatedStepDaily(amount);
+    case REPEATED_STEP_WEEKLY: return RepeatedStepWeekly(amount);
+    case REPEATED_STEP_MONTHLY: return RepeatedStepMonthly(amount, map[REPEATED_ON_DAY]);
+    case REPEATED_STEP_YEARLY: return RepeatedStepYearly(amount, map[REPEATED_ON_MONTH], map[REPEATED_ON_DAY]);
+    default: throw "BUG: Unexpected value for REPEATED_STEP_SIZE: ${map[REPEATED_STEP_SIZE]}";
+  }
+}
+
+String repeatedStepToRepresentation(RepeatedStep step) {
+  if (step is RepeatedStepDaily) {
+    return jsonEncode({REPEATED_STEP_SIZE: REPEATED_STEP_DAILY, REPEATED_AMOUNT: step.nDays});
+  } else if (step is RepeatedStepWeekly) {
+    return jsonEncode({REPEATED_STEP_SIZE: REPEATED_STEP_WEEKLY, REPEATED_AMOUNT: step.nWeeks});
+  } else if (step is RepeatedStepMonthly) {
+    return jsonEncode({REPEATED_STEP_SIZE: REPEATED_STEP_MONTHLY, REPEATED_AMOUNT: step.nMonths, REPEATED_ON_DAY: step.day});
+  } else if (step is RepeatedStepYearly) {
+    return jsonEncode({REPEATED_STEP_SIZE: REPEATED_STEP_YEARLY, REPEATED_AMOUNT: step.nYears, REPEATED_ON_MONTH: step.month, REPEATED_ON_DAY: step.day});
+  } else {
+    throw "BUG: Unhandled repeated step: $step";
+  }
 }
 
 Reminder reminderFromRepresentation(Map<String,dynamic> representation) {
@@ -175,3 +264,12 @@ Map<String,dynamic> reminderToRepresentation(Reminder reminder) {
   }
   return map;
 }
+
+bool boolFromRepresentation(int representation) {
+  return representation == 1;
+}
+
+int boolToRepresentation(bool value) {
+  return value ? 1 : 0;
+}
+

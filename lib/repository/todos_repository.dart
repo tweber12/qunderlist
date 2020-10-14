@@ -40,6 +40,7 @@ abstract class TodoRepository {
 
   // Functions accessing items
   Future<void> updateTodoItem(TodoItemBase item);
+  Future<void> updateRepeated(int itemId, Repeated repeated);
   Future<void> deleteTodoItem(int itemId);
   Future<TodoItem> getTodoItem(int id);
 
