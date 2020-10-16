@@ -12,7 +12,7 @@ class TodoItemDao {
        return await (db ?? _db).insert(TODO_ITEMS_TABLE, todoItemToRepresentation(item));
   }
 
-  Future<void> updateTodoItem(TodoItem item) async {
+  Future<void> updateTodoItem(TodoItemBase item) async {
     await _db.update(TODO_ITEMS_TABLE, todoItemToRepresentation(item),
         where: "$ID = ?", whereArgs: [item.id]);
   }

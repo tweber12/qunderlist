@@ -73,11 +73,23 @@ void main() {
     expect(await repository.getTodoItem(delId), null);
   });
 
-
   test('update item test', () async {
     var updateId = items[1].id;
     var updateItem = TodoItem("updated", DateTime.now(), id: updateId);
     await repository.updateTodoItem(updateItem);
+    for (final item in items.where((element) => element.id != updateId)) {
+      var resultItem = await repository.getTodoItem(item.id);
+      expect(resultItem, item);
+    }
+    // Reminders are not affected by the update
+    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders));
+  });
+
+
+  test('update short item test', () async {
+    var updateId = items[1].id;
+    var updateItem = TodoItem("updated", DateTime.now(), id: updateId);
+    await repository.updateTodoItem(updateItem.shorten());
     for (final item in items.where((element) => element.id != updateId)) {
       var resultItem = await repository.getTodoItem(item.id);
       expect(resultItem, item);
