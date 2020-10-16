@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
-import 'package:qunderlist/notification_handler.dart';
-import 'package:qunderlist/pigeon.dart';
+import 'package:qunderlist/notification_ffi.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 import 'package:qunderlist/screens/todo_lists_screen.dart';
@@ -90,17 +89,15 @@ class ListHomePage extends StatefulWidget {
 }
 
 class _ListHomePageState extends State<ListHomePage> {
-  Notifier dartApi;
-  Api api;
+  NotificationFFI notificationFFI;
 
   @override
   void initState() {
     super.initState();
-    api = Api();
-    dartApi = Notifier(context);
-    DartApi.setup(dartApi);
-    api.ready();
+    notificationFFI = NotificationFFI(context);
+    notificationFFI.ready();
   }
+
   Widget build(BuildContext context) {
     return BlocProvider<TodoListsBloc>(
       create: (context) {

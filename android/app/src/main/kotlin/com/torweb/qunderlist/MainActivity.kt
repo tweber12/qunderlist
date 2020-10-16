@@ -6,10 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.*
 import androidx.core.app.AlarmManagerCompat
-import androidx.core.app.JobIntentService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import dev.flutter.pigeon.Pigeon
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 
@@ -22,9 +20,7 @@ class MainActivity: FlutterActivity() {
     }
     companion object {
         var instance: MainActivity? = null
-        var dartApi: Pigeon.DartApi? = null
-        var dartReady = false
-        var callback: Long? = null
+        var notificationFFI: NotificationFFI? = null
 
         fun applicationContext() : Context {
             print(instance)
@@ -32,51 +28,9 @@ class MainActivity: FlutterActivity() {
         }
     }
 
-    private class MyApi: Pigeon.Api {
-        override fun setReminder(arg: Pigeon.SetReminder?) {
-            if (arg == null || arg.reminderId == null) {
-                return;
-            }
-            val intent = Intent(applicationContext(), AlarmService::class.java)
-                    .putExtra(REMINDER_ID_EXTRA, arg.reminderId)
-            val pendingIntent: PendingIntent = PendingIntent.getBroadcast(applicationContext(), arg.reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
-            val alarmManager = instance?.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            AlarmManagerCompat.setExactAndAllowWhileIdle(
-                    alarmManager,
-                    AlarmManager.RTC_WAKEUP,
-                    arg.time,
-                    pendingIntent
-            )
-        }
-
-        override fun updateReminder(arg: Pigeon.SetReminder?) {
-            setReminder(arg)
-        }
-
-        override fun deleteReminder(arg: Pigeon.DeleteReminder?) {
-            if (arg == null || arg.reminderId == null) {
-                return;
-            }
-            val intent = Intent(applicationContext(), AlarmService::class.java)
-            val pendingIntent: PendingIntent = PendingIntent.getBroadcast(applicationContext(), arg.reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
-            val alarmManager = instance?.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            alarmManager.cancel(pendingIntent)
-        }
-
-        override fun ready() {
-            dartReady = true
-            if (callback != null) {
-                dartApi?.notificationCallback(Pigeon.ItemId().apply { id = callback }, {})
-            }
-            callback = null
-        }
-    }
-
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        print("ON CREATE CALLED")
-        Pigeon.Api.setup(flutterEngine.dartExecutor.binaryMessenger, MyApi())
-        dartApi = Pigeon.DartApi(flutterEngine.dartExecutor.binaryMessenger)
+        notificationFFI = NotificationFFI(flutterEngine.dartExecutor.binaryMessenger)
     }
 }
 
@@ -137,12 +91,12 @@ class NotificationService: IntentService("NotificationService") {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
         }.addCategory(Intent.CATEGORY_LAUNCHER)
         startActivity(intent)
-        if (MainActivity.dartReady) {
+        if (MainActivity.notificationFFI != null && MainActivity.notificationFFI!!.dartReady) {
             Handler(Looper.getMainLooper()).post {
-                MainActivity.dartApi?.notificationCallback(Pigeon.ItemId().apply{ id = itemId}, {})
+                MainActivity.notificationFFI?.notificationCallback(itemId)
             }
         } else {
-            MainActivity.callback = itemId as Long
+            MainActivity.notificationFFI?.callback = itemId
         }
     }
 }
@@ -155,7 +109,7 @@ class CompleteService: IntentService("CompleteService") {
         val itemId = p0.getLongExtra(ITEM_ID_EXTRA, 0)
         Database(this).completeItem(itemId)
         Handler(Looper.getMainLooper()).post {
-            MainActivity.dartApi?.reloadDb { }
+            MainActivity.notificationFFI?.reloadDb()
         }
     }
 }
@@ -168,7 +122,7 @@ class SnoozeService: IntentService("SnoozeService") {
         val reminderId = p0.getLongExtra(REMINDER_ID_EXTRA, 0)
         val time = Database(this).snoozeItem(reminderId)
         Handler(Looper.getMainLooper()).post {
-            MainActivity.dartApi?.reloadDb { }
+            MainActivity.notificationFFI?.reloadDb()
         }
         val intent = Intent(this, AlarmService::class.java).putExtra(REMINDER_ID_EXTRA, reminderId)
         val pendingIntent: PendingIntent = PendingIntent.getBroadcast(this, reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)

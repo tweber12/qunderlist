@@ -5,8 +5,8 @@ import 'package:mutex/mutex.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_events.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_states.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
+import 'package:qunderlist/notification_ffi.dart';
 import 'package:qunderlist/notification_handler.dart';
-import 'package:qunderlist/pigeon.dart';
 import 'package:qunderlist/repository/repository.dart';
 
 class RateLimit {
@@ -40,7 +40,6 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   TodoItem _fullItem;
   final TodoListBloc _listBloc;
   final R _repository;
-  final Api api;
   RateLimit notifier;
   // Ensure that only one process modifies the cache and db at the same time
   // This is done to avoid problems with the db and the cache getting out of sync
@@ -52,7 +51,6 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
         _listBloc=listBloc,
         _baseItem=item,
         _itemId = itemId,
-        api = Api(),
         super(item==null ? TodoDetailsLoading() : item is TodoItem ? TodoDetailsFullyLoaded(item) : TodoDetailsLoadedShortItem(item))
   {
     notifier = _listBloc!=null ? RateLimit(Duration(seconds: 1), _notifyHelper) : null;
@@ -167,7 +165,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _fullItem = _fullItem.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
-    setReminder(event.reminder.withId(id));
+    NotificationFFI.setReminder(event.reminder.withId(id));
     _writeMutex.release();
   }
 
@@ -178,7 +176,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
     await _repository.updateReminder(event.reminder.id, event.reminder.at);
-    setReminder(event.reminder);
+    NotificationFFI.setReminder(event.reminder);
     _writeMutex.release();
   }
 
@@ -189,7 +187,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
     await _repository.deleteReminder(event.reminder.id);
-    cancelReminder(event.reminder);
+    NotificationFFI.cancelReminder(event.reminder.id);
     _writeMutex.release();
   }
 

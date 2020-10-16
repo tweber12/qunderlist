@@ -361,13 +361,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.10.0-nullsafety.1"
-  pigeon:
-    dependency: "direct main"
-    description:
-      name: pigeon
-      url: "https://pub.dartlang.org"
-    source: hosted
-    version: "0.1.10"
   pool:
     dependency: transitive
     description:
