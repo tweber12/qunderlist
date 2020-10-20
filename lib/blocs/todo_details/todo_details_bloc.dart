@@ -113,6 +113,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
+    updateReminders(_fullItem);
     _writeMutex.release();
   }
 
@@ -145,6 +146,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
+    updateReminders(_fullItem);
     _writeMutex.release();
   }
 
@@ -165,7 +167,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _fullItem = _fullItem.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
-    NotificationFFI.setReminder(event.reminder.withId(id));
+    NotificationFFI.setReminder(_fullItem, event.reminder.withId(id));
     _writeMutex.release();
   }
 
@@ -176,7 +178,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
     await _repository.updateReminder(event.reminder.id, event.reminder.at);
-    NotificationFFI.setReminder(event.reminder);
+    NotificationFFI.updateReminder(_fullItem, event.reminder);
     _writeMutex.release();
   }
 
@@ -244,6 +246,12 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
 
   void _notifyHelper() {
     _listBloc.add(NotifyItemUpdateEvent(_fullItem.shorten()));
+  }
+
+  Future<void> updateReminders(TodoItem item) async {
+    for (final r in item.reminders) {
+      await NotificationFFI.updateReminder(item, r);
+    }
   }
 
   @override

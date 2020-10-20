@@ -116,6 +116,12 @@ class TodoRepositorySqflite extends TodoRepository {
   Future<List<Reminder>> getActiveRemindersForList(int listId) => reminderDao.getActiveRemindersForList(listId);
 
   @override
+  Future<List<Reminder>> getActiveReminders() => reminderDao.getActiveReminders();
+
+  @override
+  Future<int> getItemOfReminder(int reminderId) => reminderDao.getItemOfReminder(reminderId);
+
+  @override
   Future<void> addTodoItemToList(int itemId, int listId) => listItemDao.addItemToList(itemId, listId);
 
   @override

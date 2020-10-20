@@ -9,7 +9,7 @@ Future<void> setRemindersForItem<R extends TodoRepository>(TodoItemBase item, R 
     reminders = await repository.getRemindersForItem(item.id);
   }
   for (final r in reminders) {
-    await NotificationFFI.setReminder(r);
+    await NotificationFFI.setReminder(item, r);
   }
 }
 

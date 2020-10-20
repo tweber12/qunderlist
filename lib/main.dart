@@ -95,7 +95,7 @@ class _ListHomePageState extends State<ListHomePage> {
   void initState() {
     super.initState();
     notificationFFI = NotificationFFI(context);
-    notificationFFI.ready();
+    notificationFFI.init();
   }
 
   Widget build(BuildContext context) {

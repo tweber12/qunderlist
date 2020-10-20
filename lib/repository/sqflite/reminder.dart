@@ -1,6 +1,7 @@
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/sqflite/database.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/utils/utils.dart';
 
 class ReminderDao {
   final Database _db;
@@ -36,6 +37,24 @@ class ReminderDao {
        where $TODO_LIST_ITEMS_LIST = ? and $TODO_REMINDER_TIME > ?
     """, [listId, now.toIso8601String()]);
     return results.map(reminderFromRepresentation).toList();
+  }
+
+  Future<List<Reminder>> getActiveReminders() async {
+    var now = DateTime.now();
+    var results = await _db.query(
+        TODO_REMINDERS_TABLE,
+        where: "$TODO_REMINDER_TIME > ?",
+        whereArgs: [now.toIso8601String()]
+    );
+    return results.map(reminderFromRepresentation).toList();
+  }
+
+  Future<int> getItemOfReminder(int reminderId) async {
+    var results = await _db.query(TODO_REMINDERS_TABLE,
+        columns: [TODO_REMINDER_ITEM],
+        where: "$ID = ?",
+        whereArgs: [reminderId]);
+    return firstIntValue(results);
   }
 
   Future<Map<int, List<Reminder>>> getRemindersForItems(List<int> itemIds) async {

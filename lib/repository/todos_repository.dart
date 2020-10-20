@@ -49,6 +49,8 @@ abstract class TodoRepository {
   Future<void> deleteReminder(int reminderId);
   Future<List<Reminder>> getRemindersForItem(int itemId);
   Future<List<Reminder>> getActiveRemindersForList(int listId);
+  Future<List<Reminder>> getActiveReminders();
+  Future<int> getItemOfReminder(int reminderId);
 
   // Functions accessing items in lists
   Future<TodoItem> addTodoItem(TodoItem item, {TodoList onList});
