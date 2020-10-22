@@ -27,7 +27,21 @@ class TodoItemDao {
       return null;
     }
     var reminders = await _reminders.getRemindersForItem(itemId);
-    var todoItem = todoItemFromRepresentation(results.first, reminders);
+    var onLists = await _getListsOfItem(itemId);
+    var todoItem = todoItemFromRepresentation(results.first, reminders, onLists);
     return todoItem;
+  }
+
+  Future<List<TodoList>> _getListsOfItem(int itemId) async {
+    var results = await _db.rawQuery("""
+          select $ID, $TODO_LIST_NAME, $TODO_LIST_COLOR
+            from $TODO_LISTS_TABLE
+                 join $TODO_LIST_ITEMS_TABLE
+                 on $ID = $TODO_LIST_ITEMS_LIST
+           where $TODO_LIST_ITEMS_ITEM = ?
+        order by $TODO_LIST_ORDERING asc;
+      """,
+        [itemId]);
+    return results.map((m) => todoListFromRepresentation(m)).toList();
   }
 }

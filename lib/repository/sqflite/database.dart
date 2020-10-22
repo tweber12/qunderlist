@@ -146,7 +146,7 @@ TodoItemShort todoItemShortFromRepresentation(
 }
 
 TodoItem todoItemFromRepresentation(
-    Map<String, dynamic> representation, List<Reminder> reminders) {
+    Map<String, dynamic> representation, List<Reminder> reminders, List<TodoList> onLists) {
   return TodoItem(
     representation[TODO_ITEM_NAME],
     DateTime.parse(representation[TODO_ITEM_CREATED_DATE]),
@@ -160,6 +160,7 @@ TodoItem todoItemFromRepresentation(
         ? null
         : DateTime.parse(representation[TODO_ITEM_COMPLETED_DATE]),
     reminders: reminders,
+    onLists: onLists,
   );
 }
 

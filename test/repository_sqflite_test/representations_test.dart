@@ -45,16 +45,17 @@ void main() {
   test('item representation test minimal', () async {
     TodoItem item = TodoItem("test name", DateTime.now());
     var representation = todoItemToRepresentation(item);
-    var resultItem = todoItemFromRepresentation(representation, []);
+    var resultItem = todoItemFromRepresentation(representation, [], []);
     expect(resultItem, item);
   });
 
   test('item representation test full', () async {
     var now = DateTime.now();
     var reminders = [Reminder(now), Reminder(now.add(Duration(days: 1)))];
-    TodoItem item = TodoItem("test name", now, completedOn: now, dueDate: now, note: "test note", priority: TodoPriority.high, reminders: reminders);
+    var lists = [TodoList("Title", Palette.brown), TodoList("Magic list", Palette.deepOrange), TodoList("Extra list", Palette.lime)];
+    TodoItem item = TodoItem("test name", now, completedOn: now, dueDate: now, note: "test note", priority: TodoPriority.high, reminders: reminders, onLists: lists);
     var representation = todoItemToRepresentation(item);
-    var resultItem = todoItemFromRepresentation(representation, reminders);
+    var resultItem = todoItemFromRepresentation(representation, reminders, lists);
     expect(resultItem, item);
   });
 
@@ -78,7 +79,7 @@ void main() {
     TodoItem item = TodoItem("test name", DateTime.now(), id: 8);
     var representation = todoItemToRepresentation(item);
     representation[ID] = 8;
-    var resultItem = todoItemFromRepresentation(representation, []);
+    var resultItem = todoItemFromRepresentation(representation, [], []);
     expect(resultItem, item);
   });
 }

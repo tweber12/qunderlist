@@ -73,6 +73,7 @@ class TodoRepositorySqflite extends TodoRepository {
   Future<TodoItem> addTodoItem(TodoItem item, {TodoList onList}) async {
     var id;
     await _db.transaction((txn) async {
+      assert(onList != null || item.onLists.isNotEmpty);
       id = await itemDao.addTodoItem(item, db: txn);
       if (onList != null) {
         await listItemDao.addItemToList(id, onList.id, db: txn);
