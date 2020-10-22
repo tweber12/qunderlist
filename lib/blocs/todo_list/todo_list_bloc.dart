@@ -78,7 +78,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     var item = await _repository.addTodoItem(event.item, onList: _list);
     cache = cache.addElementAtEnd(item.shorten());
     yield TodoListLoaded(_list, cache);
-    setRemindersForItem(event.item, _repository);
+    setRemindersForItem(item, _repository);
     _writeMutex.release();
   }
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
