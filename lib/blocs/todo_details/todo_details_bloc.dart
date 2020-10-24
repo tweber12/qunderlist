@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:bloc/bloc.dart';
 import 'package:mutex/mutex.dart';
+import 'package:qunderlist/blocs/repeated.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_events.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_states.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
@@ -134,11 +135,19 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem);
     if (_fullItem.completed) {
       cancelRemindersForItem(_fullItem, _repository);
+      if (_fullItem.repeatedStatus == RepeatedStatus.active) {
+        var next = await _repository.addTodoItem(nextItem(_fullItem));
+        setRemindersForItem(next, _repository);
+      }
     } else {
       setRemindersForItem(_fullItem, _repository);
     }
+    if (_fullItem.completed && !(_fullItem.repeated?.keepHistory ?? true)) {
+      await _repository.deleteTodoItem(_fullItem.id);
+    } else {
+      await _repository.updateTodoItem(_fullItem);
+    }
     _notifyList();
-    await _repository.updateTodoItem(_fullItem);
     _writeMutex.release();
   }
 

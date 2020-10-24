@@ -115,11 +115,11 @@ class TodoItem extends TodoItemBase {
     }
   }
 
-  TodoItem copyWith({int id, String todo, TodoPriority priority, DateTime createdOn, Nullable<String> note, Nullable<DateTime> dueDate, Nullable<DateTime> completedOn, List<Reminder> reminders, List<TodoList> onLists, Nullable<Repeated> repeated}) {
+  TodoItem copyWith({int id, String todo, TodoPriority priority, DateTime createdOn, Nullable<String> note, Nullable<DateTime> dueDate, Nullable<DateTime> completedOn, List<Reminder> reminders, List<TodoList> onLists, Nullable<Repeated> repeated, bool newItem = false}) {
     return TodoItem(
       todo ?? this.todo,
       createdOn ?? this.createdOn,
-      id: id ?? this.id,
+      id: newItem ? null : id ?? this.id,
       priority: priority ?? this.priority,
       note: copyNullable(note, this.note),
       dueDate: copyNullable(dueDate, this.dueDate),

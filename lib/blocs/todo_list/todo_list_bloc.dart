@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:bloc/bloc.dart';
 import 'package:mutex/mutex.dart';
 import 'package:qunderlist/blocs/cache.dart';
+import 'package:qunderlist/blocs/repeated/repeated_bloc.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_events.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_states.dart';
 import 'package:qunderlist/notification_handler.dart';
@@ -96,13 +97,13 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     }
     _writeMutex.release();
   }
+
   Stream<TodoListStates> _mapCompleteItemEventToState(CompleteItemEvent event) async* {
     await _writeMutex.acquire();
     var newItem = event.item.toggleCompleted();
     // There's not a single view which shows completed and uncompleted items, so remove it since it must've been visible before
     cache = cache.removeElement(event.index, element: event.item);
     yield TodoListLoaded(_list, cache);
-    await _repository.updateTodoItem(newItem);
     if (newItem.completed) {
       // The event has been completed, so remove all notifications
       cancelRemindersForItem(event.item, _repository);
@@ -110,8 +111,22 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       // The event has been activated again, so activate all notifications as well
       setRemindersForItem(event.item, _repository);
     }
+    if (newItem.completed && newItem.repeatedStatus == RepeatedStatus.active) {
+      // The item is repeated
+      var fullItem = await _repository.getTodoItem(newItem.id);
+      var next = nextItem(fullItem);
+      add(AddItemEvent(next));
+      if (fullItem.repeated.keepHistory) {
+        _repository.updateTodoItem(newItem);
+      } else {
+        _repository.deleteTodoItem(newItem.id);
+      }
+    } else {
+      _repository.updateTodoItem(newItem);
+    }
     _writeMutex.release();
   }
+
   Stream<TodoListStates> _mapUpdateItemPriorityEventToState(UpdateItemPriorityEvent event) async* {
     await _writeMutex.acquire();
     var newItem = event.item.copyWith(priority: event.priority);
