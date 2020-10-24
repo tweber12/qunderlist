@@ -144,7 +144,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       }
     } else {
       // In all other cases, the element is still being shown at the same location, so update it accordingly
-      cache = cache.updateElement(event.index, element: event.item);
+      cache = cache.updateElement(event.index, element: newItem);
     }
     yield TodoListLoaded(_list, cache);
     await _repository.updateTodoItem(newItem);

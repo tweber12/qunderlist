@@ -97,7 +97,8 @@ class _TodoListScreenState extends State<TodoListScreen> {
             } else {
               body = Center(child: Column(children: <Widget>[
                 Icon(_iconForFilter(filter), size: 96),
-                Text("There's nothing here", style: TextStyle(fontSize: 24),),
+                SizedBox(height: 40),
+                Text(_messageForFilter(), style: TextStyle(fontSize: 24),),
               ],
                 mainAxisAlignment: MainAxisAlignment.center,
               ),
@@ -137,6 +138,16 @@ class _TodoListScreenState extends State<TodoListScreen> {
       case 2: return TodoStatusFilter.important;
       case 3: return TodoStatusFilter.withDueDate;
       default: throw "BUG: Unsupported index for List BottomBar";
+    }
+  }
+
+  String _messageForFilter() {
+    switch (filter) {
+      case TodoStatusFilter.active: return "You've got nothing to do :)";
+      case TodoStatusFilter.completed: return "Nothing done yet ;)";
+      case TodoStatusFilter.important: return "No important tasks";
+      case TodoStatusFilter.withDueDate: return "No scheduled tasks";
+      default: throw "BUG: Unsupported filter used in list screen";
     }
   }
 
@@ -237,7 +248,7 @@ class TodoListItemCard extends StatelessWidget {
         ),
         onTap: () => _showDetails(context),
       ),
-      margin: EdgeInsets.symmetric(vertical: 0.5),
+      margin: EdgeInsets.symmetric(vertical: 1),
     );
   }
 
