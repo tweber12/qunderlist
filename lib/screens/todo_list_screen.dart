@@ -360,6 +360,7 @@ class _TodoItemAdderState extends State<TodoItemAdder> {
             title: TextField(
               controller: nameController,
               decoration: InputDecoration(labelText: "Todo"),
+              textCapitalization: TextCapitalization.sentences,
               autofocus: true,
             ),
             trailing: PriorityButton(priority, _setPriority),

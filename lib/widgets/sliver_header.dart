@@ -185,7 +185,7 @@ class _TitleUpdateDialogState extends State<TitleUpdateDialog> {
     var text = todoController.text.trim();
     return AlertDialog(
       title: Text(widget.dialogTitle),
-      content: TextField(controller: todoController, autofocus: true),
+      content: TextField(controller: todoController, autofocus: true, textCapitalization: TextCapitalization.sentences),
       actions: <Widget>[
         FlatButton(
           child: Text("Cancel"),

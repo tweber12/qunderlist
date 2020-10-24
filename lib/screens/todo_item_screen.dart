@@ -374,7 +374,7 @@ class _TodoItemDetailsNotesDialogState extends State<TodoItemDetailsNotesDialog>
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.hasNote ? "Edit notes" : "Add notes"),
-      content: TextField(controller: controller, autofocus: true, keyboardType: TextInputType.multiline, maxLength: null, maxLines: null,),
+      content: TextField(controller: controller, autofocus: true, textCapitalization: TextCapitalization.sentences, keyboardType: TextInputType.multiline, maxLength: null, maxLines: null,),
       actions: <Widget>[
         FlatButton(child: Text("Cancel"), onPressed: () => Navigator.pop(context, null),),
         RaisedButton(child: Text("Set note"), onPressed: () => Navigator.pop(context, controller.text),),

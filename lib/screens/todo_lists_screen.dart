@@ -140,7 +140,7 @@ class _TodoListAdderState extends State<TodoListAdder> {
       child: Column(
         children: <Widget>[
           ListTile(
-              title: TextField(controller: titleController, autofocus: true, decoration: InputDecoration(labelText: "List title"),)
+              title: TextField(controller: titleController, autofocus: true, textCapitalization: TextCapitalization.sentences, decoration: InputDecoration(labelText: "List title"),)
           ),
           ThemePicker(_setPalette, defaultPalette: Palette.blue,),
           Row(
