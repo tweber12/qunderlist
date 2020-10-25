@@ -75,10 +75,10 @@ class _TodoListScreenState extends State<TodoListScreen> {
   Widget build(BuildContext context) {
     var bottomNavigationBar = () => BottomNavigationBar(
       items: [
-        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.active)), title: Text("Active")),
-        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.completed)), title: Text("Completed")),
-        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.important)), title: Text("Important")),
-        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.withDueDate)), title: Text("Due")),
+        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.active)), label: "Active"),
+        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.completed)), label: "Completed"),
+        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.important)), label: "Important"),
+        BottomNavigationBarItem(icon: Icon(_iconForFilter(TodoStatusFilter.withDueDate)), label: "Due"),
       ],
       currentIndex: _filterToBottomBarIndex(filter),
       type: BottomNavigationBarType.fixed,
