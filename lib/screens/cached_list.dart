@@ -79,7 +79,7 @@ class CachedList<T extends Cacheable> extends StatelessWidget {
   }
 }
 
-class DismissibleItem extends StatelessWidget {
+class DismissibleItem<T> extends StatelessWidget {
   final Key key;
   final Widget child;
   final String deleteMessage;
@@ -87,8 +87,8 @@ class DismissibleItem extends StatelessWidget {
   final String confirmMessage;
   final String deletedMessage;
 
-  final Function() onDismissed;
-  final Function() undoAction;
+  final T Function() onDismissed;
+  final Function(T) undoAction;
 
   DismissibleItem({@required this.key, @required this.child, @required this.deleteMessage, this.onDismissed, this.undoAction, this.confirmMessage, this.deletedMessage});
 
@@ -101,11 +101,11 @@ class DismissibleItem extends StatelessWidget {
         confirmDismiss: confirmMessage==null ? null : (_) => showDialog(context: context, child: ConfirmDismissDialog(title: confirmMessage)),
         onDismissed: (_) {
           if (onDismissed != null) {
-            onDismissed();
+            var item = onDismissed();
             Scaffold.of(context).showSnackBar(
                 SnackBar(
                   content: Text(deletedMessage ?? "Item deleted"),
-                  action: undoAction==null ? null : SnackBarAction(label: "undo", onPressed: undoAction),
+                  action: undoAction==null ? null : SnackBarAction(label: "undo", onPressed: () => undoAction(item)),
                 )
             );
           }

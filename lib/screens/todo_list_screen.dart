@@ -223,13 +223,16 @@ class TodoListItemList extends StatelessWidget {
     return Container(
       child: CachedList(
           cache: items,
-          itemBuilder: (context, index, item) => DismissibleItem(
+          itemBuilder: (context, index, TodoItemShort item) => DismissibleItem(
               key: Key(item.id.toString()),
               child: TodoListItemCard(index, item),
               deleteMessage: "Delete todo item",
               deletedMessage: "Todo item deleted",
-              onDismissed: () => bloc.add(DeleteItemEvent(item, index: index)),
-              undoAction: () => bloc.add(AddItemEvent(item)),
+              onDismissed: () {
+                bloc.add(DeleteItemEvent(item, index: index));
+                return RepositoryProvider.of<TodoRepository>(context).getTodoItem(item.id);
+              },
+              undoAction: (Future<TodoItem> item) async => bloc.add(AddItemEvent(await item)),
           ),
           reorderCallback: reorderable ? (from, to) async => bloc.add(ReorderItemsEvent(await items.peekItem(from), from, await items.peekItem(to), to)) : null,
           itemHeight: 55
