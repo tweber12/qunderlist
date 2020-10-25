@@ -15,6 +15,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:qunderlist/widgets/change_text_dialog.dart';
 
 class SliverHeader extends StatefulWidget {
   final String title;
@@ -84,7 +85,7 @@ class _SliverHeaderState extends State<SliverHeader> {
   void _updateTitle(BuildContext context) async {
     var newTitle = await showDialog(
       context: context,
-      child: TitleUpdateDialog(widget.dialogTitle, title),
+      child: ChangeTextDialog(title: widget.dialogTitle, initial: title),
     );
     if (newTitle == null) {
       return;
@@ -152,51 +153,6 @@ class _HeaderText extends StatelessWidget {
         onTap: () => updateTitle(context),
       ),
       padding: EdgeInsetsDirectional.only(start: paddingLeft, end: paddingRight),
-    );
-  }
-}
-
-
-class TitleUpdateDialog extends StatefulWidget {
-  final String dialogTitle;
-  final String oldTitle;
-  TitleUpdateDialog(this.dialogTitle, this.oldTitle);
-
-  @override
-  State<StatefulWidget> createState() {
-    return _TitleUpdateDialogState();
-  }
-}
-
-class _TitleUpdateDialogState extends State<TitleUpdateDialog> {
-  TextEditingController todoController;
-
-  @override
-  void initState() {
-    super.initState();
-    todoController = TextEditingController(text: widget.oldTitle);
-    todoController.addListener(() {
-      setState(() {});
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    var text = todoController.text.trim();
-    return AlertDialog(
-      title: Text(widget.dialogTitle),
-      content: TextField(controller: todoController, autofocus: true, textCapitalization: TextCapitalization.sentences),
-      actions: <Widget>[
-        FlatButton(
-          child: Text("Cancel"),
-          onPressed: () => Navigator.pop(context, null),
-        ),
-        RaisedButton(
-          child: Text("Update"),
-          onPressed:
-          text.isNotEmpty ? () => Navigator.pop(context, text) : null,
-        )
-      ],
     );
   }
 }

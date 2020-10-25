@@ -14,6 +14,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:qunderlist/blocs/cache.dart';
+import 'package:qunderlist/widgets/confirm_dialog.dart';
 import 'package:reorderables/reorderables.dart';
 
 class CachedList<T extends Cacheable> extends StatelessWidget {
@@ -98,7 +99,7 @@ class DismissibleItem<T> extends StatelessWidget {
         key: key,
         child: child,
         background: Container( color: Colors.red, child: ListTile(leading: Icon(Icons.delete_outline, color: Colors.white),title: Text(deleteMessage, style: TextStyle(color: Colors.white),)),),
-        confirmDismiss: confirmMessage==null ? null : (_) => showDialog(context: context, child: ConfirmDismissDialog(title: confirmMessage)),
+        confirmDismiss: confirmMessage==null ? null : (_) => showDialog(context: context, child: ConfirmDeleteDialog(title: confirmMessage)),
         onDismissed: (_) {
           if (onDismissed != null) {
             var item = onDismissed();
@@ -110,29 +111,6 @@ class DismissibleItem<T> extends StatelessWidget {
             );
           }
         },
-    );
-  }
-}
-
-class ConfirmDismissDialog extends StatelessWidget {
-  final String title;
-  final String subtitle;
-
-  ConfirmDismissDialog({@required this.title, this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    var subtitleWidget;
-    if (subtitle != null) {
-      subtitleWidget = Text(subtitle);
-    }
-    return AlertDialog(
-      title: Text(title),
-      content: subtitleWidget,
-      actions: <Widget>[
-        FlatButton(child: Text("Cancel"), onPressed: () => Navigator.pop(context, false),),
-        RaisedButton( child: Text("Delete"), onPressed: () => Navigator.pop(context, true),),
-      ],
     );
   }
 }

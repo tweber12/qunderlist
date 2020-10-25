@@ -19,6 +19,7 @@ import 'package:qunderlist/blocs/todo_details.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/theme.dart';
+import 'package:qunderlist/widgets/change_text_dialog.dart';
 import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
 import 'package:qunderlist/widgets/repeated.dart';
@@ -325,7 +326,7 @@ class TodoItemDetailsNotes extends StatelessWidget {
         title: Text(hasNote ? note : "no notes"),
         trailing: hasNote ? removeButton(context, note) : null,
         onTap: () async {
-          var newNote = await showDialog(context: context, child: TodoItemDetailsNotesDialog(note));
+          var newNote = await showDialog(context: context, child: ChangeTextDialog(title: "Edit note", initial: note, multiline: true,));
           print("new note");
           if (newNote != null && newNote != note) {
             BlocProvider.of<TodoDetailsBloc>(context).add(UpdateNoteEvent(newNote));
@@ -348,37 +349,6 @@ class TodoItemDetailsNotes extends StatelessWidget {
           )
         ));
       },
-    );
-  }
-}
-
-class TodoItemDetailsNotesDialog extends StatefulWidget {
-  final String note;
-  final bool hasNote;
-  TodoItemDetailsNotesDialog(this.note): hasNote = note!=null && note.trim()!="";
-
-  @override
-  _TodoItemDetailsNotesDialogState createState() => _TodoItemDetailsNotesDialogState();
-}
-
-class _TodoItemDetailsNotesDialogState extends State<TodoItemDetailsNotesDialog> {
-  TextEditingController controller;
-
-  @override
-  void initState() {
-    super.initState();
-    controller = TextEditingController(text: widget.note);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.hasNote ? "Edit notes" : "Add notes"),
-      content: TextField(controller: controller, autofocus: true, textCapitalization: TextCapitalization.sentences, keyboardType: TextInputType.multiline, maxLength: null, maxLines: null,),
-      actions: <Widget>[
-        FlatButton(child: Text("Cancel"), onPressed: () => Navigator.pop(context, null),),
-        RaisedButton(child: Text("Set note"), onPressed: () => Navigator.pop(context, controller.text),),
-      ],
     );
   }
 }
