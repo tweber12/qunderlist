@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
+import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
@@ -23,13 +24,13 @@ import 'package:qunderlist/theme.dart';
 import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
 
-Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, R repository, TodoList initialList) {
+Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, R repository, TodoList initialList, {TodoListsBloc listsBloc}) {
   TodoStatusFilter initialFilter = TodoStatusFilter.active;
   return RepositoryProvider.value(
     value: repository,
     child: BlocProvider<TodoListBloc>(
       create: (context) {
-        var bloc = TodoListBloc(repository, initialList);
+        var bloc = TodoListBloc(repository, initialList, listsBloc: listsBloc);
         bloc.add(GetDataEvent(filter: initialFilter));
         return bloc;
       },

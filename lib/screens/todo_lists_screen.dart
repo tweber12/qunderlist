@@ -66,8 +66,8 @@ class _TodoListsListViewState extends State<TodoListsListView> {
 
   @override
   void initState() {
-    _bloc = BlocProvider.of(context);
     super.initState();
+    _bloc = BlocProvider.of(context);
   }
 
   @override
@@ -104,7 +104,7 @@ class TodoListCard extends StatelessWidget {
           height: 50,
           child: ListTile(leading: Icon(Icons.list), title: Text(list.listName, style: TextStyle(fontSize: 15))),
         ),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, RepositoryProvider.of<TodoRepository>(context), list))),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, RepositoryProvider.of<TodoRepository>(context), list, listsBloc: BlocProvider.of<TodoListsBloc>(context)))),
       ),
       margin: EdgeInsets.symmetric(vertical: 0.5),
     );

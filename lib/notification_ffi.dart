@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
+import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
@@ -133,7 +134,7 @@ class NotificationFFI {
   Future<void> _notificationCallback(int itemId) async {
     var repository = RepositoryProvider.of<TodoRepository>(_context);
     var list = (await repository.getListsOfItem(itemId)).first;
-    var bloc = TodoListBloc(repository, list, filter: TodoStatusFilter.active);
+    var bloc = TodoListBloc(repository, list, filter: TodoStatusFilter.active, listsBloc: BlocProvider.of<TodoListsBloc>(_context));
     bloc.add(GetDataEvent(filter: TodoStatusFilter.active));
     var navigator = Navigator.of(_context);
     navigator.pushAndRemoveUntil(

@@ -20,18 +20,21 @@ import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/repeated/repeated_bloc.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_events.dart';
 import 'package:qunderlist/blocs/todo_list/todo_list_states.dart';
+import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 
 class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoListStates> {
   R _repository;
+  TodoListsBloc _listsBloc;
   TodoList _list;
   // Ensure that only one process modifies the cache and db at the same time
   // This is done to avoid problems with the db and the cache getting out of sync
   final Mutex _writeMutex = Mutex();
   StreamSubscription<ExternalUpdate> _updateStream;
-  TodoListBloc(R repository, TodoList list, {TodoStatusFilter filter: TodoStatusFilter.active}):
+  TodoListBloc(R repository, TodoList list, {TodoStatusFilter filter: TodoStatusFilter.active, TodoListsBloc listsBloc}):
         _repository=repository,
+        _listsBloc=listsBloc,
         _list=list,
         this.filter=filter,
         super(TodoListLoading(list))
@@ -76,16 +79,21 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   Stream<TodoListStates> _mapRenameListEventToState(RenameListEvent event) async* {
     await _repository.updateTodoList(TodoList(event.name, _list.color, id: _list.id));
     yield TodoListLoaded(_list, cache);
+    _notifyListsBloc();
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {
     await cancelRemindersForList(_list, _repository);
     await _repository.deleteTodoList(_list.id);
     yield TodoListDeleted();
+    _notifyListsBloc();
   }
   Stream<TodoListStates> _mapGetDataEventToState(GetDataEvent event) async* {
     yield* _updateCacheWithFilter(event.filter);
   }
   Stream<TodoListStates> _mapNotifyItemUpdateEventToState(NotifyItemUpdateEvent event) async* {
+    if (event.item != null) {
+      _notifyListsBloc();
+    }
     yield* _updateCacheForce();
   }
   Stream<TodoListStates> _mapAddItemEventToState(AddItemEvent event) async* {
@@ -94,6 +102,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     cache = cache.addElementAtEnd(item.shorten());
     yield TodoListLoaded(_list, cache);
     setRemindersForItem(item, _repository);
+    _notifyListsBloc();
     _writeMutex.release();
   }
   Stream<TodoListStates> _mapDeleteItemEventToState(DeleteItemEvent event) async* {
@@ -109,6 +118,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       await _repository.deleteTodoItem(event.item.id);
       cancelRemindersForItem(event.item, _repository);
     }
+    _notifyListsBloc();
     _writeMutex.release();
   }
 
@@ -138,6 +148,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     } else {
       _repository.updateTodoItem(newItem);
     }
+    _notifyListsBloc();
     _writeMutex.release();
   }
 
@@ -196,7 +207,11 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     _writeMutex.release();
   }
 
-@override
+  void _notifyListsBloc() {
+    _listsBloc?.add(ExternalUpdateEvent());
+  }
+
+  @override
   Future<void> close() {
     _updateStream.cancel();
     return super.close();
