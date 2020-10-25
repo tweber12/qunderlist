@@ -503,3 +503,28 @@ class Chunk<T extends Cacheable> {
       return [Chunk(start, data1), Chunk(start+data1.length, data2)];
   }
 }
+
+class ElementCache<T> {
+  HashMap<int, Future<T>> _loading = HashMap();
+  Future<T> Function(int index) _loader;
+
+  ElementCache(Future<T> Function(int index) loader): _loader = loader;
+
+  Future<T> getElement(int index) {
+    var load = _loading[index];
+    if (load != null) {
+      return load;
+    }
+    load = _loader(index);
+    _loading[index] = load;
+    return load;
+  }
+
+  void preload(int index) {
+    _loading.putIfAbsent(index, () => _loader(index));
+  }
+
+  void invalidate() {
+    _loading.clear();
+  }
+}

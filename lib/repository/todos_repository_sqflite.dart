@@ -84,6 +84,9 @@ class TodoRepositorySqflite extends TodoRepository {
   Future<List<TodoList>> getMatchingLists(String pattern, {int limit=5}) => listDao.getMatchingLists(pattern, limit);
 
   @override
+  Future<int> getNumberOfOverdueItems(int listId) => listItemDao.getNumberOfOverdueItems(listId);
+
+  @override
   Future<TodoItem> addTodoItem(TodoItem item, {TodoList onList}) async {
     var id;
     await _db.transaction((txn) async {

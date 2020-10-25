@@ -25,7 +25,9 @@ class TodoListsLoading extends TodoListsStates {
 
 class TodoListsLoaded extends TodoListsStates {
   final ListCache<TodoList> lists;
-  TodoListsLoaded(this.lists);
+  final ElementCache<int> numberOfItems;
+  final ElementCache<int> numberOfOverdueItems;
+  TodoListsLoaded(this.lists, this.numberOfItems, this.numberOfOverdueItems);
 
   @override
   List<Object> get props => [lists];

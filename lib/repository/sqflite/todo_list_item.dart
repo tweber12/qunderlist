@@ -111,6 +111,20 @@ class TodoListItemDao {
     return results.map((m) => todoListFromRepresentation(m)).toList();
   }
 
+  Future<int> getNumberOfOverdueItems(int listId) async {
+    var now = DateTime.now();
+    var today = DateTime(now.year, now.month, now.day);
+    var results = await _db.rawQuery("""
+          select count(1)
+            from $TODO_ITEMS_TABLE
+                 join $TODO_LIST_ITEMS_TABLE
+                 on $ID = $TODO_LIST_ITEMS_ITEM
+           where $TODO_LIST_ITEMS_LIST = ? and $TODO_ITEM_COMPLETED_DATE is null and $TODO_ITEM_DUE_DATE < ?
+      """,
+        [listId, today.toIso8601String()]);
+    return firstIntValue(results);
+  }
+
   Future<void> _getMaxOrdering() async {
     var results = await _db.rawQuery("""
         select $TODO_LIST_ITEMS_LIST, max($TODO_LIST_ITEMS_ORDERING)

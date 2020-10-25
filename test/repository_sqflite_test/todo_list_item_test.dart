@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qunderlist/repository/models.dart';
 import 'package:qunderlist/repository/sqflite/database.dart';
@@ -230,6 +231,22 @@ void main() {
         }
         expect(await repository.getNumberOfTodoItems(lists[listIndex].id, TodoStatusFilter.withDueDate), active);
       }
+    });
+
+    test("get number overdue", () async {
+      var now = DateTime.now();
+      expect(await repository.getNumberOfOverdueItems(lists[0].id), 0);
+      expect(await repository.getNumberOfOverdueItems(lists[1].id), 0);
+      await repository.addTodoItem(TodoItem("a1", now, dueDate: now), onList: lists[0]);
+      await repository.addTodoItem(TodoItem("a2", now, dueDate: now.subtract(Duration(days: 5))), onList: lists[0]);
+      await repository.addTodoItem(TodoItem("a3", now, dueDate: now.subtract(Duration(days: 1))), onList: lists[0]);
+      await repository.addTodoItem(TodoItem("a4", now, dueDate: now.add(Duration(days: 1))), onList: lists[0]);
+      await repository.addTodoItem(TodoItem("b1", now, dueDate: now.subtract(Duration(days: 2))), onList: lists[1]);
+      await repository.addTodoItem(TodoItem("b2", now, dueDate: DateTime(now.year, now.month, now.day)), onList: lists[1]);
+      await repository.addTodoItem(TodoItem("b3", now, dueDate: now.subtract(Duration(hours: 25))), onList: lists[1]);
+      await repository.addTodoItem(TodoItem("b4", now, dueDate: now.subtract(Duration(days: 10))), onList: lists[1]);
+      expect(await repository.getNumberOfOverdueItems(lists[0].id), 2);
+      expect(await repository.getNumberOfOverdueItems(lists[1].id), 3);
     });
 
     test("add item to list", () async {

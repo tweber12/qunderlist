@@ -25,11 +25,18 @@ import 'package:qunderlist/repository/repository.dart';
 class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, TodoListsStates> {
   R _repository;
   ListCache<TodoList> cache;
+  ElementCache<int> numberOfItems;
+  ElementCache<int> numberOfOverdueItems;
   // Ensure that only one process modifies the cache and db at the same time
   // This is done to avoid problems with the db and the cache getting out of sync
   Mutex _writeMutex = Mutex();
   StreamSubscription<ExternalUpdate> _updateStream;
-  TodoListsBloc(repository): _repository=repository, super(TodoListsLoading()) {
+  TodoListsBloc(TodoRepository repository):
+        _repository=repository,
+        numberOfItems = ElementCache((int index) => repository.getNumberOfTodoItems(index, TodoStatusFilter.active)),
+        numberOfOverdueItems = ElementCache((int index) => repository.getNumberOfOverdueItems(index)),
+        super(TodoListsLoading())
+  {
     _updateStream = repository.updateStream.listen((_) => add(ExternalUpdateEvent()));
   }
 
@@ -56,7 +63,7 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
     }
     cache = ListCache(underlyingData, totalLength);
     await cache.init(0);
-    yield TodoListsLoaded(cache);
+    yield TodoListsLoaded(cache, numberOfItems, numberOfOverdueItems);
     _writeMutex.release();
   }
 
@@ -64,14 +71,14 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
     await _writeMutex.acquire();
     int id = await _repository.addTodoList(event.list);
     cache = cache.addElementAtEnd(event.list.withId(id));
-    yield TodoListsLoaded(cache);
+    yield TodoListsLoaded(cache, numberOfItems, numberOfOverdueItems);
     _writeMutex.release();
   }
 
   Stream<TodoListsStates> _mapTodoListDeletedEventToState(TodoListDeletedEvent event) async* {
     await _writeMutex.acquire();
     cache = cache.removeElement(event.index, element: event.list);
-    yield TodoListsLoaded(cache);
+    yield TodoListsLoaded(cache, numberOfItems, numberOfOverdueItems);
     await cancelRemindersForList(event.list, _repository);
     await _repository.deleteTodoList(event.list.id);
     _writeMutex.release();
@@ -80,7 +87,7 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
   Stream<TodoListsStates> _mapReorderTodoListsEventToState(TodoListsReorderedEvent event) async* {
     await _writeMutex.acquire();
     cache = cache.reorderElements(event.moveFromIndex, event.moveToIndex, event.moveFrom, elementTo: event.moveTo);
-    yield TodoListsLoaded(cache);
+    yield TodoListsLoaded(cache, numberOfItems, numberOfOverdueItems);
     await _repository.moveTodoList(event.moveFrom.id, event.moveToIndex+1);
     _writeMutex.release();
   }
@@ -94,7 +101,9 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
     var newCache = ListCache(underlyingData, totalLength);
     await newCache.init(0);
     cache = newCache;
-    yield TodoListsLoaded(cache);
+    numberOfItems.invalidate();
+    numberOfOverdueItems.invalidate();
+    yield TodoListsLoaded(cache, numberOfItems, numberOfOverdueItems);
     _writeMutex.release();
   }
 

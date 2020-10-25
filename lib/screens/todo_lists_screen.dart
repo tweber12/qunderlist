@@ -77,7 +77,7 @@ class _TodoListsListViewState extends State<TodoListsListView> {
           cache: widget.state.lists,
           itemBuilder: (context, index, item) => DismissibleItem(
             key: Key(item.id.toString()),
-            child: TodoListCard(item),
+            child: TodoListCard(item, widget.state.numberOfItems.getElement(item.id), widget.state.numberOfOverdueItems.getElement(item.id)),
             deleteMessage: "Delete todo list",
             deletedMessage: "Todo list deleted",
             onDismissed: () => _bloc.add(TodoListDeletedEvent(item, index)),
@@ -86,7 +86,6 @@ class _TodoListsListViewState extends State<TodoListsListView> {
           reorderCallback: (from, to) async => _bloc.add(TodoListsReorderedEvent(await widget.state.lists.peekItem(from), from, await widget.state.lists.peekItem(to), to)),
           itemHeight: 50
       ),
-      color: Colors.blue.shade200,
       padding: EdgeInsets.symmetric(horizontal: 8),
     );
   }
@@ -94,22 +93,82 @@ class _TodoListsListViewState extends State<TodoListsListView> {
 
 class TodoListCard extends StatelessWidget {
   final TodoList list;
-  TodoListCard(this.list);
+  final Future<int> numberOfActiveItems;
+  final Future<int> numberOfOverdueItems;
+  final Color color;
+  TodoListCard(this.list, this.numberOfActiveItems, this.numberOfOverdueItems):
+        color = themeFromPalette(list.color).primaryColor;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        child: Container(
-          height: 50,
-          child: ListTile(leading: Icon(Icons.list), title: Text(list.listName, style: TextStyle(fontSize: 15))),
-        ),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, RepositoryProvider.of<TodoRepository>(context), list, listsBloc: BlocProvider.of<TodoListsBloc>(context)))),
+    return InkWell(
+      child: Container(
+        height: 55,
+        child: Stack(children: [
+          ListTile(
+              leading: Icon(Icons.list, size: 28),
+              title: Text(list.listName, style: TextStyle(fontSize: 17)),
+              trailing: Row(children: [
+                NumberOfOverdueItems(numberOfOverdueItems),
+                NumberOfItems(numberOfActiveItems, themeFromPalette(list.color))
+              ], mainAxisSize: MainAxisSize.min),
+          ),
+          Container(color: color, height: 1, margin: EdgeInsets.only(top: 41, left: 16, right: 16)),
+        ]),
       ),
-      margin: EdgeInsets.symmetric(vertical: 0.5),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, RepositoryProvider.of<TodoRepository>(context), list, listsBloc: BlocProvider.of<TodoListsBloc>(context)))),
     );
   }
 }
+
+class NumberOfOverdueItems extends StatelessWidget {
+  final Future<int> _number;
+  NumberOfOverdueItems(Future<int> number): _number = number;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+        future: _number,
+        initialData: 0,
+        builder: (context, AsyncSnapshot<int> snapshot) {
+          var number = snapshot.data ?? 0;
+          if (number == 0) {
+            return Container(width: 0, height: 0,);
+          } else {
+            return Container(
+              child: Container(child: Text(number.toString(), style: TextStyle(color: Colors.red.shade900, fontWeight: FontWeight.bold)), margin: EdgeInsets.symmetric(vertical: 2, horizontal: 6)),
+              decoration: ShapeDecoration(color: Colors.red.shade200, shape: StadiumBorder()),
+              margin: EdgeInsets.only(right: 5),
+            );
+          }
+        }
+    );
+  }
+}
+
+
+class NumberOfItems extends StatelessWidget {
+  final Future<String> _number;
+  final ThemeData theme;
+
+  NumberOfItems(Future<int> number, this.theme): _number = number.then((value) => value.toString());
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+        future: _number,
+        initialData: "",
+        builder: (context, AsyncSnapshot<String> snapshot) {
+          var number = snapshot.data ?? "";
+          return Container(
+            child: Container(child: Text(number, style: TextStyle(color: Colors.white)), margin: EdgeInsets.symmetric(vertical: 2, horizontal: 6)),
+            decoration: ShapeDecoration(color: theme.primaryColor, shape: StadiumBorder()),
+          );
+        }
+    );
+  }
+}
+
 
 class TodoListAdder extends StatefulWidget {
   final TodoListsBloc bloc;

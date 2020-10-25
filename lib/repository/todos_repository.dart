@@ -51,6 +51,7 @@ abstract class TodoRepository {
   Future<int> getNumberOfTodoLists();
   Future<List<TodoList>> getTodoListsChunk(int start, int end);
   Future<List<TodoList>> getMatchingLists(String pattern, {int limit=5});
+  Future<int> getNumberOfOverdueItems(int listId);
 
   // Functions accessing items
   Future<void> updateTodoItem(TodoItemBase item);
