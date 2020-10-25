@@ -53,6 +53,8 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   Stream<TodoListStates> mapEventToState(TodoListEvent event) async* {
     if (event is RenameListEvent) {
       yield* _mapRenameListEventToState(event);
+    } else if (event is ChangeListColorEvent) {
+      yield* _mapChangeListColorEventToState(event);
     } else if (event is DeleteListEvent) {
       yield* _mapDeleteListEventToState(event);
     } else if (event is GetDataEvent) {
@@ -77,9 +79,20 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   }
 
   Stream<TodoListStates> _mapRenameListEventToState(RenameListEvent event) async* {
-    await _repository.updateTodoList(TodoList(event.name, _list.color, id: _list.id));
+    await _writeMutex.acquire();
+    _list = TodoList(event.name, _list.color, id: _list.id);
     yield TodoListLoaded(_list, cache);
+    await _repository.updateTodoList(_list);
     _notifyListsBloc();
+    _writeMutex.release();
+  }
+  Stream<TodoListStates> _mapChangeListColorEventToState(ChangeListColorEvent event) async* {
+    await _writeMutex.acquire();
+    _list = TodoList(_list.listName, event.color, id: _list.id);
+    yield TodoListLoaded(_list, cache);
+    await _repository.updateTodoList(_list);
+    _notifyListsBloc();
+    _writeMutex.release();
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {
     await cancelRemindersForList(_list, _repository);

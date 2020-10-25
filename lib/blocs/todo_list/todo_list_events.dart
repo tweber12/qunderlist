@@ -28,6 +28,14 @@ class RenameListEvent extends TodoListEvent {
   List<Object> get props => [name];
 }
 
+class ChangeListColorEvent extends TodoListEvent {
+  final Palette color;
+  ChangeListColorEvent(this.color);
+
+  @override
+  List<Object> get props => [color];
+}
+
 class DeleteListEvent extends TodoListEvent {
   @override
   List<Object> get props => [];

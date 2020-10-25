@@ -21,6 +21,8 @@ import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
 import 'package:qunderlist/theme.dart';
+import 'package:qunderlist/widgets/change_text_dialog.dart';
+import 'package:qunderlist/widgets/confirm_dialog.dart';
 import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
 
@@ -34,10 +36,7 @@ Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, R repo
         bloc.add(GetDataEvent(filter: initialFilter));
         return bloc;
       },
-      child: Theme(
-          child: TodoListScreen(initialFilter),
-          data: themeFromPalette(initialList.color),
-      ),
+      child: TodoListScreen(initialFilter),
     )
   );
 }
@@ -91,9 +90,11 @@ class _TodoListScreenState extends State<TodoListScreen> {
         AppBar appBar;
         Widget body;
         FloatingActionButton floatingActionButton;
+        ThemeData theme;
         if (state is TodoListLoading) {
             appBar = AppBar(title: Text(state.list.listName),);
             body = LinearProgressIndicator();
+            theme = themeFromPalette(state.list.color);
         } else if (state is TodoListLoadingFailed) {
             appBar = AppBar(title: Text("Qunderlist"));
             body = Center(child: Text("Failed to load list!"));
@@ -105,8 +106,9 @@ class _TodoListScreenState extends State<TodoListScreen> {
               body = Center(child: Text("Error: The list was deleted!"));
           }
         } else if (state is TodoListLoaded) {
-            appBar = AppBar(title: Text(state.list.listName));
+            appBar = AppBar(title: Text(state.list.listName), actions: [ListExtraActionsButton(state.list)],);
             floatingActionButton = FloatingActionButton(child: Icon(Icons.add), onPressed: () {showModalBottomSheet(context: context, builder: (context) => TodoItemAdder(bloc), isScrollControlled: true);});
+            theme = themeFromPalette(state.list.color);
             if (state.items.totalNumberOfItems != 0) {
               body = TodoListItemList(state.items, reorderable: filter==TodoStatusFilter.active);
             } else {
@@ -122,11 +124,14 @@ class _TodoListScreenState extends State<TodoListScreen> {
         } else {
           throw "BUG: Unhandled state in todo lists screen";
         }
-        return Scaffold(
-          appBar: appBar,
-          body: body,
-          floatingActionButton: floatingActionButton,
-          bottomNavigationBar: bottomNavigationBar(),
+        return Theme(
+            child: Scaffold(
+              appBar: appBar,
+              body: body,
+              floatingActionButton: floatingActionButton,
+              bottomNavigationBar: bottomNavigationBar(),
+            ),
+            data: theme,
         );
       },
     );
@@ -335,6 +340,109 @@ class TodoListItemCard extends StatelessWidget {
     );
   }
 }
+
+enum _ListExtraActions {
+  rename,
+  changeColor,
+  delete,
+}
+
+class ListExtraActionsButton extends StatelessWidget {
+  final TodoList list;
+  ListExtraActionsButton(this.list);
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton(
+        itemBuilder: (context) => const [
+          const PopupMenuItem(child: ListTile(leading: Icon(Icons.edit), title: Text("Rename list"),), value: _ListExtraActions.rename,),
+          const PopupMenuItem(child: ListTile(leading: Icon(Icons.color_lens_rounded), title: Text("Change color"),), value: _ListExtraActions.changeColor,),
+          const PopupMenuItem(child: ListTile(leading: Icon(Icons.delete), title: Text("Delete list")), value: _ListExtraActions.delete)
+        ],
+        onSelected: (_ListExtraActions action) async {
+          switch (action) {
+            case _ListExtraActions.rename:
+              showRenameDialog(context);
+              break;
+            case _ListExtraActions.changeColor:
+              showColorDialog(context);
+              break;
+            case _ListExtraActions.delete:
+              showDeleteDialog(context);
+              break;
+          }
+        },
+    );
+  }
+
+  void showRenameDialog(BuildContext context) async {
+    var name = await showDialog(
+      context: context,
+      builder: (context) => ChangeTextDialog(title: "Rename list", initial: list.listName),
+    );
+    if (name != null && name != list.listName) {
+      BlocProvider.of<TodoListBloc>(context).add(RenameListEvent(name));
+    }
+  }
+
+  void showColorDialog(BuildContext context) async {
+    var color = await showDialog(
+      context: context,
+      builder: (context) => ChangeColorDialog(initial: list.color),
+    );
+    if (color != null && color != list.color) {
+      BlocProvider.of<TodoListBloc>(context).add(ChangeListColorEvent(color));
+    }
+  }
+
+  void showDeleteDialog(BuildContext context) async {
+    var confirmed = await showDialog(
+        context: context,
+        builder: (context) => ConfirmDeleteDialog(title: "Delete list '${list.listName}'?")
+    );
+    if (confirmed) {
+      BlocProvider.of<TodoListBloc>(context).add(DeleteListEvent());
+      Navigator.pop(context);
+    }
+  }
+}
+
+class ChangeColorDialog extends StatefulWidget {
+  final Palette initial;
+  ChangeColorDialog({this.initial: Palette.blue});
+
+  @override
+  _ChangeColorDialogState createState() => _ChangeColorDialogState();
+}
+
+class _ChangeColorDialogState extends State<ChangeColorDialog> {
+  Palette selected;
+
+  @override
+  void initState() {
+    super.initState();
+    selected = widget.initial;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text("Change color"),
+      content: ThemePicker(selectTheme, defaultPalette: widget.initial,),
+      actions: [
+        FlatButton(onPressed: () => Navigator.pop(context), child: Text("Cancel")),
+        RaisedButton(onPressed: () => Navigator.pop(context, selected), child: Text("Update")),
+      ],
+    );
+  }
+
+  void selectTheme(Palette theme) {
+    setState(() {
+      selected = theme;
+    });
+  }
+}
+
 
 
 class TodoItemAdder extends StatefulWidget {
