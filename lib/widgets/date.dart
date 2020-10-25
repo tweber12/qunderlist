@@ -18,7 +18,7 @@ import 'package:qunderlist/repository/models.dart';
 
 class DueDateTile extends DateTile {
   DueDateTile(Function(DateTime dueDate) onDateChange, {DateTime initialDate}):
-      super(onDateChange, initialDate: initialDate, noDateMessage: "no due date", preDateMessage: "due ");
+      super(onDateChange, selectedDate: initialDate, noDateMessage: "no due date", preDateMessage: "due ");
 }
 
 class ReminderTile extends StatelessWidget {
@@ -102,19 +102,6 @@ class _ReminderChip extends StatelessWidget {
 }
 
 
-class DateTile extends StatefulWidget {
-  final Function(DateTime dueDate) onDateChange;
-  final DateTime initialDate;
-  final bool allowRemove;
-  final String noDateMessage;
-  final String preDateMessage;
-
-  DateTile(this.onDateChange, {this.initialDate, this.allowRemove=true, this.noDateMessage, this.preDateMessage});
-
-  @override
-  _DateTileState createState() => _DateTileState();
-}
-
 enum _DateSelection {
   today,
   tomorrow,
@@ -122,8 +109,14 @@ enum _DateSelection {
   other,
 }
 
-class _DateTileState extends State<DateTile> {
-  DateTime _selected;
+class DateTile extends StatelessWidget {
+  final Function(DateTime dueDate) onDateChange;
+  final DateTime selectedDate;
+  final bool allowRemove;
+  final String noDateMessage;
+  final String preDateMessage;
+
+  DateTile(this.onDateChange, {this.selectedDate, this.allowRemove=true, this.noDateMessage, this.preDateMessage});
 
   static const _POPUP_MENU_ITEMS = [
     PopupMenuItem<_DateSelection>(
@@ -137,20 +130,14 @@ class _DateTileState extends State<DateTile> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _selected = widget.initialDate;
-  }
-
-  @override
   Widget build(BuildContext context) {
     // TODO Build something so that the popup appears over the text, not at the start of the button
     // The offset parameter is completely useless, annoyingly
     return PopupMenuButton(
       child: ListTile(
         leading: Icon(Icons.today),
-        title: Text(_selected==null ? widget.noDateMessage ?? "" : "${widget.preDateMessage ?? ""}${formatDate(_selected)}"),
-        trailing: !widget.allowRemove || _selected==null ? null : _removeButton(context),
+        title: Text(selectedDate==null ? noDateMessage ?? "" : "${preDateMessage ?? ""}${formatDate(selectedDate)}"),
+        trailing: !allowRemove || selectedDate==null ? null : _removeButton(context),
       ),
       itemBuilder: (context) => _POPUP_MENU_ITEMS,
       onSelected: (selected) async => await _itemSelected(context, selected),
@@ -177,10 +164,7 @@ class _DateTileState extends State<DateTile> {
   }
 
   void _setDate(DateTime date) {
-    setState(() {
-      _selected = date;
-    });
-    widget.onDateChange(date);
+    onDateChange(date);
   }
 
   Future<void> _askForDate(BuildContext context, DateTime now) async {
@@ -333,7 +317,7 @@ class _ReminderDialogState extends State<ReminderDialog> {
       title: Text("Set reminder"),
       content: Column(
         children: [
-          DateTile(_updateDate, initialDate: reminderAt, allowRemove: false),
+          DateTile(_updateDate, selectedDate: reminderAt, allowRemove: false),
           TimeTile(_updateTime, initialTime: reminderAt, today: today),
         ],
         mainAxisSize: MainAxisSize.min,
