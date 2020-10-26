@@ -98,12 +98,14 @@ class _TodoListScreenState extends State<TodoListScreen> {
         } else if (state is TodoListLoadingFailed) {
             appBar = AppBar(title: Text("Qunderlist"));
             body = Center(child: Text("Failed to load list!"));
+            theme = themeFromPalette(Palette.blue);
         } else if (state is TodoListDeleted) {
           if (Navigator.canPop(context)) {
             Navigator.pop(context);
           } else {
               appBar = AppBar(title: Text("Qunderlist"));
               body = Center(child: Text("Error: The list was deleted!"));
+              theme = themeFromPalette(Palette.blue);
           }
         } else if (state is TodoListLoaded) {
             appBar = AppBar(title: Text(state.list.listName), actions: [ListExtraActionsButton(state.list)],);
