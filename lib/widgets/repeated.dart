@@ -30,7 +30,7 @@ class RepeatedTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(Icons.repeat),
-      title: Text(_repeatedTitle(), style: TextStyle(color: active ? Colors.black54 : Colors.black26),),
+      title: Text(_repeatedTitle()),
       trailing: active ? _removeButton() : null,
       onTap: () async {
         var result = await showRepeatedDialog(context, initial: repeated, dueDate: dueDate);
@@ -98,7 +98,8 @@ class RepeatedDialog extends StatelessWidget {
           title: Text("Repeat every"),
           content: ListView(
             children: [
-              QuantityTile(
+              Padding(
+                child: QuantityTile(
                   state.repeated.step.amount,
                   state.repeated.step.stepSize,
                   (amount) => BlocProvider.of<RepeatedBloc>(context).add(RepeatedSetAmountEvent(amount)),
@@ -109,6 +110,8 @@ class RepeatedDialog extends StatelessWidget {
                     DropdownMenuItem(child: Text("years"), value: RepeatedStepSize.yearly,),
                   ],
                   (size) => BlocProvider.of<RepeatedBloc>(context).add(RepeatedSetStepSizeEvent(size))
+                ),
+                padding: EdgeInsets.only(left: 16),
               ),
               CheckboxListTile(
                   title: Text("Auto advance"),
@@ -126,10 +129,11 @@ class RepeatedDialog extends StatelessWidget {
                   onChanged: (value) => BlocProvider.of<RepeatedBloc>(context).add(RepeatedToggleKeepHistoryEvent(value))
               ),
             ],
+            shrinkWrap: true,
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text("Cancel")),
-            OutlinedButton(onPressed: state.valid ? () => Navigator.pop(context, state.repeated) : null, child: Text("Set"))
+            FlatButton(onPressed: () => Navigator.pop(context), child: Text("Cancel")),
+            RaisedButton(onPressed: state.valid ? () => Navigator.pop(context, state.repeated) : null, child: Text("Set"))
           ],
         );
       },
@@ -163,7 +167,7 @@ class _QuantityTileState extends State<QuantityTile> {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        SizedBox(width: 80, child: TextField(controller: amountController, keyboardType: TextInputType.number, )),
+        SizedBox(width: 45, child: TextField(controller: amountController, keyboardType: TextInputType.number, textAlign: TextAlign.center,)),
         SizedBox(width: 20,),
         DropdownButton(items: widget.units, value: widget.unit, onChanged: widget.onUnitChanged),
       ]
