@@ -128,8 +128,9 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       await _repository.removeTodoItemFromList(event.item.id, _list.id);
     } else {
       // No other lists contain this item, so delete it and all it's reminders
+      var full = await _repository.getTodoItem(event.item.id);
       await _repository.deleteTodoItem(event.item.id);
-      cancelRemindersForItem(event.item, _repository);
+      cancelRemindersForItem(full, _repository);
     }
     _notifyListsBloc();
     _writeMutex.release();
