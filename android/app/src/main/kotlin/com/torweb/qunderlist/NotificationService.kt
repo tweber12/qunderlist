@@ -29,7 +29,6 @@ const val JOB_TYPE = "type"
 const val JOB_TYPE_COMPLETE = "complete"
 const val JOB_TYPE_RESTORE = "restore"
 
-const val SHARED_PREFERENCES = "notification_service_preferences"
 const val SHARED_PREFERENCES_CALLBACK_HANDLE = "callback_handle"
 const val SHARED_PREFERENCES_COMPLETED_ITEMS = "completed_items"
 

@@ -21,6 +21,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.AlarmManagerCompat
+import androidx.core.app.NotificationManagerCompat
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.sync.Mutex
@@ -112,19 +113,11 @@ class NotificationFFI(private val context: Context, binaryMessenger: BinaryMesse
         if (reminderId == null || reminderTime == null || itemId == null) {
             return
         }
-        val intent = Intent(context, AlarmService::class.java)
-                .putExtra(REMINDER_ID_EXTRA, reminderId)
-                .putExtra(ITEM_ID_EXTRA, itemId)
-                .putExtra(ITEM_TITLE_EXTRA, itemTitle)
-                .putExtra(ITEM_NOTE_EXTRA, itemNote)
-        val pendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        AlarmManagerCompat.setExactAndAllowWhileIdle(
-                alarmManager,
-                AlarmManager.RTC_WAKEUP,
-                reminderTime,
-                pendingIntent
-        )
+        if (isNotificationRegistered(context, reminderId)) {
+            showNotification(context, reminderId, itemId, itemTitle, itemNote)
+        } else {
+            setAlarm(context, reminderId, reminderTime, itemId, itemTitle, itemNote)
+        }
     }
 
     private fun updateReminder(args: Map<String, Any>) {
@@ -132,10 +125,18 @@ class NotificationFFI(private val context: Context, binaryMessenger: BinaryMesse
     }
 
     private fun deleteReminder(reminderId: Any) {
-        val intent = Intent(context, AlarmService::class.java)
-        val pendingIntent: PendingIntent = PendingIntent.getBroadcast(context, ffiInt(reminderId).toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        alarmManager.cancel(pendingIntent)
+        val id = ffiInt(reminderId)
+        if (isNotificationRegistered(context, id)) {
+            with(NotificationManagerCompat.from(context)) {
+                cancel(id.toInt())
+            }
+            unRegisterNotification(context, id)
+        } else {
+            val intent = Intent(context, AlarmService::class.java)
+            val pendingIntent: PendingIntent = PendingIntent.getBroadcast(context, id.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            alarmManager.cancel(pendingIntent)
+        }
     }
 }
 

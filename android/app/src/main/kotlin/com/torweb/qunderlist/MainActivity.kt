@@ -21,7 +21,6 @@ import android.content.Intent
 import android.content.Intent.ACTION_BOOT_COMPLETED
 import android.os.*
 import androidx.core.app.AlarmManagerCompat
-import androidx.core.app.JobIntentService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -38,6 +37,9 @@ const val REMINDER_ID_EXTRA = "reminder_id"
 const val ITEM_ID_EXTRA = "item_id"
 const val ITEM_TITLE_EXTRA = "item_title"
 const val ITEM_NOTE_EXTRA = "item_note"
+
+const val SHARED_PREFERENCES = "notification_service_preferences"
+const val SHARED_PREFERENCES_NOTIFICATION_PREFIX = "notification"
 
 const val ACTION_OPEN = "com.torweb.qunderlist.open"
 const val ACTION_SNOOZE = "com.torweb.qunderlist.snooze"
@@ -72,44 +74,8 @@ class AlarmService: BroadcastReceiver() {
         }
         val itemTitle = intent.getStringExtra(ITEM_TITLE_EXTRA)
         val itemNote = intent.getStringExtra(ITEM_NOTE_EXTRA)
-        val showItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_OPEN; putExtra(ITEM_ID_EXTRA, itemId) }
-        val showItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), showItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val completeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_COMPLETE; putExtra(ITEM_ID_EXTRA, itemId) }
-        val completeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), completeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val snoozeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_SNOOZE; putExtra(REMINDER_ID_EXTRA, reminderId) }
-        val snoozeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), snoozeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
-
-        createNotificationChannel(context)
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.mipmap.ic_launcher)
-                .setContentTitle(itemTitle)
-                .setContentIntent(showItemPendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .addAction(0, "Complete", completeItemPendingIntent)
-                .addAction(0, "Snooze", snoozeItemPendingIntent)
-        if (!itemNote.isBlank()) {
-            builder.setContentText(itemNote)
-        }
-        with(NotificationManagerCompat.from(context)) {
-            notify(reminderId.toInt(), builder.build())
-        }
-    }
-
-    private fun createNotificationChannel(context: Context) {
-        // Create the NotificationChannel, but only on API 26+ because
-        // the NotificationChannel class is new and not in the support library
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = context.getString(R.string.channel_name)
-            val descriptionText = context.getString(R.string.channel_description)
-            val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
-                description = descriptionText
-            }
-            // Register the channel with the system
-            val notificationManager: NotificationManager =
-                    context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
-        }
+        showNotification(context, reminderId, itemId, itemTitle, itemNote)
+        registerNotification(context, reminderId)
     }
 }
 
@@ -118,10 +84,15 @@ class NotificationReceiver: BroadcastReceiver() {
         if (context == null || intent == null) {
             return
         }
+        val reminderId = intent.getLongExtra(REMINDER_ID_EXTRA, 0)
         when (intent.action) {
             ACTION_OPEN -> openApp(context, intent.getLongExtra(ITEM_ID_EXTRA, 0))
-            ACTION_SNOOZE -> snoozeReminder(context, intent.getLongExtra(REMINDER_ID_EXTRA, 0))
+            ACTION_SNOOZE -> snoozeReminder(context, reminderId)
             ACTION_COMPLETE -> completeItem(context, intent.getLongExtra(ITEM_ID_EXTRA, 0))
+        }
+        with(NotificationManagerCompat.from(context)) {
+            cancel(reminderId.toInt())
+            unRegisterNotification(context, reminderId)
         }
     }
 
@@ -164,4 +135,77 @@ class RebootReceiver: BroadcastReceiver() {
         }
         enqueueRestoreJob(context)
     }
+}
+
+fun showNotification(context: Context, reminderId: Long, itemId: Long, itemTitle: String, itemNote: String) {
+    val showItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_OPEN; putExtra(REMINDER_ID_EXTRA, reminderId); putExtra(ITEM_ID_EXTRA, itemId) }
+    val showItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), showItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+    val completeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_COMPLETE; putExtra(REMINDER_ID_EXTRA, reminderId); putExtra(ITEM_ID_EXTRA, itemId) }
+    val completeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), completeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+    val snoozeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_SNOOZE; putExtra(REMINDER_ID_EXTRA, reminderId) }
+    val snoozeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), snoozeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+    val dismissNotificationIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_DISMISSED; putExtra(REMINDER_ID_EXTRA, reminderId) }
+    val dismissNotificationPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), dismissNotificationIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+
+    createNotificationChannel(context)
+    val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(itemTitle)
+            .setContentIntent(showItemPendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .addAction(0, "Complete", completeItemPendingIntent)
+            .addAction(0, "Snooze", snoozeItemPendingIntent)
+            .setDeleteIntent(dismissNotificationPendingIntent)
+            .setOnlyAlertOnce(true)
+    if (!itemNote.isBlank()) {
+        builder.setContentText(itemNote)
+    }
+    with(NotificationManagerCompat.from(context)) {
+        notify(reminderId.toInt(), builder.build())
+    }
+}
+
+fun setAlarm(context: Context, reminderId: Long, reminderTime: Long, itemId: Long, itemTitle: String, itemNote: String ) {
+    val intent = Intent(context, AlarmService::class.java)
+            .putExtra(REMINDER_ID_EXTRA, reminderId)
+            .putExtra(ITEM_ID_EXTRA, itemId)
+            .putExtra(ITEM_TITLE_EXTRA, itemTitle)
+            .putExtra(ITEM_NOTE_EXTRA, itemNote)
+    val pendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    AlarmManagerCompat.setExactAndAllowWhileIdle(
+            alarmManager,
+            AlarmManager.RTC_WAKEUP,
+            reminderTime,
+            pendingIntent
+    )
+}
+
+private fun createNotificationChannel(context: Context) {
+    // Create the NotificationChannel, but only on API 26+ because
+    // the NotificationChannel class is new and not in the support library
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val name = context.getString(R.string.channel_name)
+        val descriptionText = context.getString(R.string.channel_description)
+        val importance = NotificationManager.IMPORTANCE_HIGH
+        val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
+            description = descriptionText
+        }
+        // Register the channel with the system
+        val notificationManager: NotificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
+    }
+}
+
+private fun registerNotification(context: Context, id: Long) {
+    context.getSharedPreferences(SHARED_PREFERENCES, Context.MODE_PRIVATE).edit().putBoolean("${SHARED_PREFERENCES_NOTIFICATION_PREFIX}_$id", true).apply()
+}
+
+fun isNotificationRegistered(context: Context, id: Long): Boolean {
+    return context.getSharedPreferences(SHARED_PREFERENCES, Context.MODE_PRIVATE).getBoolean("${SHARED_PREFERENCES_NOTIFICATION_PREFIX}_$id", false)
+}
+
+fun unRegisterNotification(context: Context, id: Long) {
+    context.getSharedPreferences(SHARED_PREFERENCES, Context.MODE_PRIVATE).edit().remove("${SHARED_PREFERENCES_NOTIFICATION_PREFIX}_$id").apply()
 }
