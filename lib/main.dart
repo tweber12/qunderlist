@@ -91,7 +91,14 @@ class _RepositoryHomePageState extends State<RepositoryHomePage> {
         }
         return RepositoryProvider<TodoRepository>.value(
             value: snapshot.data,
-            child: ListHomePage()
+            child: BlocProvider<TodoListsBloc>(
+              create: (context) {
+                var bloc = TodoListsBloc(snapshot.data);
+                bloc.add(LoadTodoListsEvent());
+                return bloc;
+              },
+              child: ListHomePage(),
+            )
         );
       },
     );
@@ -113,14 +120,7 @@ class _ListHomePageState extends State<ListHomePage> {
   }
 
   Widget build(BuildContext context) {
-    return BlocProvider<TodoListsBloc>(
-      create: (context) {
-        var bloc = TodoListsBloc(RepositoryProvider.of<TodoRepository>(context));
-        bloc.add(LoadTodoListsEvent());
-        return bloc;
-      },
-      child: TodoListsScreen(),
-    );
+    return TodoListsScreen();
   }
 }
 
