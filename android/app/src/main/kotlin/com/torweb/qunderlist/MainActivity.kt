@@ -18,8 +18,10 @@ import android.app.*
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.Intent.ACTION_BOOT_COMPLETED
 import android.os.*
 import androidx.core.app.AlarmManagerCompat
+import androidx.core.app.JobIntentService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -36,6 +38,11 @@ const val REMINDER_ID_EXTRA = "reminder_id"
 const val ITEM_ID_EXTRA = "item_id"
 const val ITEM_TITLE_EXTRA = "item_title"
 const val ITEM_NOTE_EXTRA = "item_note"
+
+const val ACTION_OPEN = "com.torweb.qunderlist.open"
+const val ACTION_SNOOZE = "com.torweb.qunderlist.snooze"
+const val ACTION_COMPLETE = "com.torweb.qunderlist.complete"
+const val ACTION_DISMISSED = "com.torweb.qunderlist.dismissed"
 
 class MainActivity: FlutterActivity() {
     init {
@@ -65,12 +72,12 @@ class AlarmService: BroadcastReceiver() {
         }
         val itemTitle = intent.getStringExtra(ITEM_TITLE_EXTRA)
         val itemNote = intent.getStringExtra(ITEM_NOTE_EXTRA)
-        val showItemIntent = Intent(context, ShowItemService::class.java).putExtra(ITEM_ID_EXTRA, itemId)
-        val showItemPendingIntent: PendingIntent = PendingIntent.getService(context, reminderId.toInt(), showItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val completeItemIntent = Intent(context, CompleteService::class.java).putExtra(ITEM_ID_EXTRA, itemId)
-        val completeItemPendingIntent: PendingIntent = PendingIntent.getService(context, reminderId.toInt(), completeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val snoozeItemIntent = Intent(context, SnoozeService::class.java).putExtra(REMINDER_ID_EXTRA, reminderId)
-        val snoozeItemPendingIntent: PendingIntent = PendingIntent.getService(context, reminderId.toInt(), snoozeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val showItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_OPEN; putExtra(ITEM_ID_EXTRA, itemId) }
+        val showItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), showItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val completeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_COMPLETE; putExtra(ITEM_ID_EXTRA, itemId) }
+        val completeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), completeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val snoozeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_SNOOZE; putExtra(REMINDER_ID_EXTRA, reminderId) }
+        val snoozeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), snoozeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
 
         createNotificationChannel(context)
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -106,46 +113,36 @@ class AlarmService: BroadcastReceiver() {
     }
 }
 
-class ShowItemService: IntentService("ShowItemService") {
-    override fun onHandleIntent(p0: Intent?) {
-        if (p0 == null) {
+class NotificationReceiver: BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        if (context == null || intent == null) {
             return
         }
-        val itemId = p0.getLongExtra(ITEM_ID_EXTRA, 0)
-        val intent = Intent(this, MainActivity::class.java).apply {
+        when (intent.action) {
+            ACTION_OPEN -> openApp(context, intent.getLongExtra(ITEM_ID_EXTRA, 0))
+            ACTION_SNOOZE -> snoozeReminder(context, intent.getLongExtra(REMINDER_ID_EXTRA, 0))
+            ACTION_COMPLETE -> completeItem(context, intent.getLongExtra(ITEM_ID_EXTRA, 0))
+        }
+    }
+
+    private fun openApp(context: Context, itemId: Long) {
+        val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED
         }.addCategory(Intent.CATEGORY_LAUNCHER)
-        startActivity(intent)
+        context.startActivity(intent)
         GlobalScope.launch {
             MainActivity.ffiReady.withLock {
                 MainActivity.notificationFFI?.notificationCallback(itemId)
             }
         }
     }
-}
 
-class CompleteService: IntentService("CompleteService") {
-    override fun onHandleIntent(p0: Intent?) {
-        if (p0 == null) {
-            return
-        }
-        val itemId = p0.getLongExtra(ITEM_ID_EXTRA, 0)
-        enqueueCompleteJob(this, itemId)
-        addToCompletedItems(this, itemId)
-    }
-}
-
-class SnoozeService: IntentService("SnoozeService") {
-    override fun onHandleIntent(p0: Intent?) {
-        if (p0 == null) {
-            return
-        }
-        val reminderId = p0.getLongExtra(REMINDER_ID_EXTRA, 0)
+    private fun snoozeReminder(context: Context, reminderId: Long) {
         val time = Calendar.getInstance()
         time.add(Calendar.MINUTE, 20)
-        val intent = Intent(this, AlarmService::class.java).putExtra(REMINDER_ID_EXTRA, reminderId)
-        val pendingIntent: PendingIntent = PendingIntent.getBroadcast(this, reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val alarmManager = this.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(context, AlarmService::class.java).putExtra(REMINDER_ID_EXTRA, reminderId)
+        val pendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         AlarmManagerCompat.setExactAndAllowWhileIdle(
                 alarmManager,
                 AlarmManager.RTC_WAKEUP,
@@ -153,10 +150,18 @@ class SnoozeService: IntentService("SnoozeService") {
                 pendingIntent
         )
     }
+
+    private fun completeItem(context: Context, itemId: Long) {
+        enqueueCompleteJob(context, itemId)
+        addToCompletedItems(context, itemId)
+    }
 }
 
 class RebootReceiver: BroadcastReceiver() {
     override fun onReceive(context: Context, p1: Intent?) {
+        if (p1 == null || p1.action != ACTION_BOOT_COMPLETED) {
+            return
+        }
         enqueueRestoreJob(context)
     }
 }
