@@ -80,6 +80,11 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
     cache = cache.removeElement(event.index, element: event.list);
     yield TodoListsLoaded(cache, numberOfItems, numberOfOverdueItems);
     await cancelRemindersForList(event.list, _repository);
+    var autoCompleting = await _repository.getPendingItems(listId: event.list.id);
+    for (final i in autoCompleting) {
+      var item = await _repository.getTodoItem(i);
+      cancelPendingItem(item, _repository);
+    }
     await _repository.deleteTodoList(event.list.id);
     _writeMutex.release();
   }

@@ -28,6 +28,7 @@ const val JOB_ID = 3124
 const val JOB_TYPE = "type"
 const val JOB_TYPE_COMPLETE = "complete"
 const val JOB_TYPE_RESTORE = "restore"
+const val JOB_TYPE_CREATE_NEXT = "create_next"
 
 const val SHARED_PREFERENCES_CALLBACK_HANDLE = "callback_handle"
 const val SHARED_PREFERENCES_COMPLETED_ITEMS = "completed_items"
@@ -53,6 +54,7 @@ class NotificationService: JobIntentService() {
         when (intent.getStringExtra(JOB_TYPE)) {
             JOB_TYPE_COMPLETE -> completeItem(intent)
             JOB_TYPE_RESTORE -> restoreAlarms()
+            JOB_TYPE_CREATE_NEXT -> createNext(intent)
         }
     }
 
@@ -67,6 +69,12 @@ class NotificationService: JobIntentService() {
         val ffi: NotificationFFI = MainActivity.notificationFFI ?: backgroundFFI!!
         ffi.restoreAlarms()
     }
+
+    private fun createNext(intent: Intent) {
+        val itemId = intent.getLongExtra(ITEM_ID_EXTRA,0)
+        val ffi: NotificationFFI = MainActivity.notificationFFI ?: backgroundFFI!!
+        ffi.createNext(itemId)
+    }
 }
 
 fun enqueueCompleteJob(context: Context, itemId: Long) {
@@ -76,6 +84,11 @@ fun enqueueCompleteJob(context: Context, itemId: Long) {
 
 fun enqueueRestoreJob(context: Context) {
     val intent = Intent(context, NotificationService::class.java).putExtra(JOB_TYPE, JOB_TYPE_RESTORE)
+    JobIntentService.enqueueWork(context, NotificationService::class.java, JOB_ID, intent)
+}
+
+fun enqueueCreateNextJob(context: Context, itemId: Long) {
+    val intent = Intent(context, NotificationService::class.java).putExtra(ITEM_ID_EXTRA, itemId).putExtra(JOB_TYPE, JOB_TYPE_CREATE_NEXT)
     JobIntentService.enqueueWork(context, NotificationService::class.java, JOB_ID, intent)
 }
 

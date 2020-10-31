@@ -131,6 +131,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
     updateReminders(_fullItem);
+    setPendingItem(_fullItem, _repository);
     _writeMutex.release();
   }
 
@@ -150,11 +151,13 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     if (_fullItem.completed) {
       cancelRemindersForItem(_fullItem, _repository);
       if (_fullItem.repeatedStatus == RepeatedStatus.active) {
+        cancelPendingItem(_fullItem, _repository);
         var next = await _repository.addTodoItem(nextItem(_fullItem));
         setRemindersForItem(next, _repository);
       }
     } else {
       setRemindersForItem(_fullItem, _repository);
+      setPendingItem(_fullItem, _repository);
     }
     if (_fullItem.completed && !(_fullItem.repeated?.keepHistory ?? true)) {
       await _repository.deleteTodoItem(_fullItem.id);
@@ -172,15 +175,18 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
     updateReminders(_fullItem);
+    setPendingItem(_fullItem, _repository);
     _writeMutex.release();
   }
 
   Stream<TodoDetailsState> _mapUpdateDueDateEventToState(UpdateDueDateEvent event) async* {
     await _writeMutex.acquire();
     if (event.newDueDate == null) {
+      cancelPendingItem(_fullItem, _repository);
       _fullItem = _fullItem.copyWith(dueDate: Nullable(event.newDueDate), repeated: Nullable(null));
     } else {
       _fullItem = _fullItem.copyWith(dueDate: Nullable(event.newDueDate), repeated: Nullable(_fullItem.repeated?.copyWith(active: true)));
+      setPendingItem(_fullItem, _repository);
     }
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
@@ -205,6 +211,11 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
       await _repository.updateTodoItem(_fullItem);
     }
     await _repository.updateRepeated(_fullItem.id, _fullItem.repeated);
+    if (event.repeated != null && event.repeated.autoAdvance) {
+      setPendingItem(_fullItem, _repository);
+    } else {
+      cancelPendingItem(_fullItem, _repository);
+    }
     _writeMutex.release();
   }
 
@@ -217,6 +228,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem);
     _notifyList();
     NotificationFFI.setReminder(_fullItem, event.reminder.withId(id));
+    setPendingItem(_fullItem, _repository);
     _writeMutex.release();
   }
 
@@ -228,6 +240,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _notifyList();
     await _repository.updateReminder(event.reminder.id, event.reminder.at);
     NotificationFFI.updateReminder(_fullItem, event.reminder);
+    setPendingItem(_fullItem, _repository);
     _writeMutex.release();
   }
 
@@ -239,6 +252,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _notifyList();
     await _repository.deleteReminder(event.reminder.id);
     NotificationFFI.cancelReminder(event.reminder.id);
+    setPendingItem(_fullItem, _repository);
     _writeMutex.release();
   }
 
@@ -282,6 +296,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _notifyList();
     await _repository.deleteTodoItem(_fullItem.id);
     cancelRemindersForItem(_fullItem, _repository);
+    cancelPendingItem(_fullItem, _repository);
   }
 
   Stream<TodoDetailsState> _externalUpdate(ExternalUpdateEvent event) async* {

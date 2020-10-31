@@ -25,17 +25,22 @@ import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
 import 'package:qunderlist/screens/todo_list_screen.dart';
 
+import 'blocs/repeated.dart';
+
 const String NOTIFICATION_FFI_CHANNEL_NAME = "com.torweb.qunderlist.notification_ffi_channel";
 const String NOTIFICATION_FFI_BG_CHANNEL_NAME = "com.torweb.qunderlist.notification_ffi_background_channel";
 
 const String NOTIFICATION_FFI_NOTIFICATION_CALLBACK = "notification_callback";
 const String NOTIFICATION_FFI_COMPLETE_ITEM = "complete_item";
 const String NOTIFICATION_FFI_RESTORE_ALARMS = "restore_alarms";
-
+const String NOTIFICATION_FFI_CREATE_NEXT = "create_next";
 
 const String NOTIFICATION_FFI_SET_REMINDER = "set_reminder";
 const String NOTIFICATION_FFI_UPDATE_REMINDER = "update_reminder";
 const String NOTIFICATION_FFI_DELETE_REMINDER = "delete_reminder";
+const String NOTIFICATION_FFI_SET_NEXT = "set_next";
+const String NOTIFICATION_FFI_UPDATE_NEXT = "update_next";
+const String NOTIFICATION_FFI_DELETE_NEXT = "delete_next";
 const String NOTIFICATION_FFI_INIT = "init";
 const String NOTIFICATION_FFI_READY = "ready";
 
@@ -44,6 +49,8 @@ const String NOTIFICATION_FFI_ITEM_TITLE = "title";
 const String NOTIFICATION_FFI_ITEM_NOTE = "note";
 const String NOTIFICATION_FFI_REMINDER_ID = "id";
 const String NOTIFICATION_FFI_REMINDER_TIME = "at";
+const String NOTIFICATION_FFI_NEXT_ID = "next_id";
+const String NOTIFICATION_FFI_NEXT_TIME = "next_time";
 
 class NotificationFFI {
   static const MethodChannel METHOD_CHANNEL = const MethodChannel(NOTIFICATION_FFI_CHANNEL_NAME);
@@ -100,6 +107,19 @@ class NotificationFFI {
     return _invoke(NOTIFICATION_FFI_DELETE_REMINDER, reminderId);
   }
 
+  static Future<void> setPendingItemAlarm(int createId, int baseItemId, DateTime date) {
+    var args = {
+      NOTIFICATION_FFI_NEXT_ID: createId,
+      NOTIFICATION_FFI_ITEM_ID: baseItemId,
+      NOTIFICATION_FFI_NEXT_TIME: date.millisecondsSinceEpoch,
+    };
+    return _invoke(NOTIFICATION_FFI_CREATE_NEXT, args);
+  }
+
+  static Future<void> cancelPendingItemAlarm(int createId) {
+    return _invoke(NOTIFICATION_FFI_DELETE_NEXT, createId);
+  }
+
   static Future<dynamic> _invoke(String method, [dynamic arguments]) async {
     var result;
     try {
@@ -127,6 +147,8 @@ class NotificationFFI {
         case NOTIFICATION_FFI_RESTORE_ALARMS:
           _restoreAlarms(RepositoryProvider.of<TodoRepository>(_context));
           break;
+        case NOTIFICATION_FFI_CREATE_NEXT:
+          _createNext(RepositoryProvider.of<TodoRepository>(_context), call.arguments as int);
       }
     });
   }
@@ -165,6 +187,9 @@ void _backgroundCallback() {
       case NOTIFICATION_FFI_RESTORE_ALARMS:
         _restoreAlarms(await TodoRepositorySqflite.getInstance());
         break;
+      case NOTIFICATION_FFI_CREATE_NEXT:
+        _createNext(await TodoRepositorySqflite.getInstance(), call.arguments as int);
+        break;
     }
   });
   BACKGROUND_METHOD_CHANNEL.invokeMethod(NOTIFICATION_FFI_READY);
@@ -185,4 +210,24 @@ Future<void> _restoreAlarms<R extends TodoRepository>(R repository) async {
     var item = await repository.getTodoItem(itemId);
     await NotificationFFI.setReminder(item, r);
   }
+  var autoCompleting = await repository.getPendingItems();
+  for (final i in autoCompleting) {
+    var item = await repository.getTodoItem(i);
+    setPendingItem(item, repository);
+  }
+}
+
+Future<void> _createNext<R extends TodoRepository>(R repository, int itemId) async {
+  var item = await repository.getTodoItem(itemId);
+  if (item.repeated.autoComplete) {
+    if (item.repeated.keepHistory) {
+      repository.updateTodoItem(item.toggleCompleted());
+    } else {
+      repository.deleteTodoItem(item.id);
+    }
+  }
+  var next = nextItem(item);
+  await repository.addTodoItem(next);
+  replaceRemindersForPendingItem(item, next, repository);
+  setPendingItem(next, repository);
 }

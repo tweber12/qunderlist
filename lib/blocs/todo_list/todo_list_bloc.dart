@@ -96,6 +96,11 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {
     await cancelRemindersForList(_list, _repository);
+    var autoCompleting = await _repository.getPendingItems(listId: _list.id);
+    for (final i in autoCompleting) {
+      var item = await _repository.getTodoItem(i);
+      cancelPendingItem(item, _repository);
+    }
     await _repository.deleteTodoList(_list.id);
     yield TodoListDeleted();
     _notifyListsBloc();
@@ -145,9 +150,11 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     if (newItem.completed) {
       // The event has been completed, so remove all notifications
       cancelRemindersForItem(event.item, _repository);
+      cancelPendingItem(await _repository.getTodoItem(event.item.id), _repository);
     } else {
       // The event has been activated again, so activate all notifications as well
       setRemindersForItem(event.item, _repository);
+      setPendingItem(await _repository.getTodoItem(event.item.id), _repository);
     }
     if (newItem.completed && newItem.repeatedStatus == RepeatedStatus.active) {
       // The item is repeated
