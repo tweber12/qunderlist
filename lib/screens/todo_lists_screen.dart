@@ -116,7 +116,7 @@ class TodoListCard extends StatelessWidget {
           Container(color: color, height: 1, margin: EdgeInsets.only(top: 41, left: 16, right: 16)),
         ]),
       ),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, RepositoryProvider.of<TodoRepository>(context), list, listsBloc: BlocProvider.of<TodoListsBloc>(context)))),
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, list))),
     );
   }
 }

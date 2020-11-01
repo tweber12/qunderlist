@@ -26,28 +26,22 @@ import 'package:qunderlist/widgets/confirm_dialog.dart';
 import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
 
-Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, R repository, TodoList initialList, {TodoListsBloc listsBloc}) {
+Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, TodoList initialList) {
   TodoStatusFilter initialFilter = TodoStatusFilter.active;
-  return RepositoryProvider.value(
-    value: repository,
-    child: BlocProvider<TodoListBloc>(
-      create: (context) {
-        var bloc = TodoListBloc(repository, initialList, listsBloc: listsBloc);
-        bloc.add(GetDataEvent(filter: initialFilter));
-        return bloc;
-      },
-      child: TodoListScreen(initialFilter),
-    )
+  return BlocProvider<TodoListBloc>(
+    create: (context) {
+      var bloc = TodoListBloc(RepositoryProvider.of<TodoRepository>(context), initialList, listsBloc: BlocProvider.of<TodoListsBloc>(context));
+      bloc.add(GetDataEvent(filter: initialFilter));
+      return bloc;
+    },
+    child: TodoListScreen(initialFilter),
   );
 }
 
-Widget showTodoListScreenExternal<R extends TodoRepository>(BuildContext context, R repository, TodoListBloc bloc) {
-  return RepositoryProvider.value(
-      value: repository,
-      child: BlocProvider<TodoListBloc>.value(
-        value: bloc,
-        child: TodoListScreen(bloc.filter),
-      )
+Widget showTodoListScreenExternal<R extends TodoRepository>(BuildContext context, TodoListBloc bloc) {
+  return BlocProvider<TodoListBloc>.value(
+    value: bloc,
+    child: TodoListScreen(bloc.filter),
   );
 }
 
@@ -334,7 +328,6 @@ class TodoListItemCard extends StatelessWidget {
         MaterialPageRoute(
             builder: (ctx) => showTodoItemScreen(
                 ctx,
-                RepositoryProvider.of<TodoRepository>(context),
                 initialItem: item,
                 todoListBloc: BlocProvider.of<TodoListBloc>(context)
             )

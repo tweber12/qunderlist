@@ -25,26 +25,23 @@ import 'package:qunderlist/widgets/priority.dart';
 import 'package:qunderlist/widgets/repeated.dart';
 import 'package:qunderlist/widgets/sliver_header.dart';
 
-Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, R repository, {int itemId, TodoItemBase initialItem, TodoListBloc todoListBloc}) {
+Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, {int itemId, TodoItemBase initialItem, TodoListBloc todoListBloc}) {
   assert(itemId != null || initialItem != null);
-  return RepositoryProvider.value(
-      value: repository,
-      child: BlocProvider<TodoDetailsBloc>(
-        create: (context) {
-          var bloc = TodoDetailsBloc(
-              repository,
-              itemId ?? initialItem.id,
-              item: initialItem,
-              listBloc: todoListBloc
-          );
-          bloc.add(LoadItemEvent());
-          return bloc;
-        },
-        child: Theme(
-            child: TodoItemDetailScreen(),
-            data: themeFromPalette(todoListBloc?.color ?? Palette.blue),
-        ),
-      )
+  return BlocProvider<TodoDetailsBloc>(
+    create: (context) {
+      var bloc = TodoDetailsBloc(
+          RepositoryProvider.of<TodoRepository>(context),
+          itemId ?? initialItem.id,
+          item: initialItem,
+          listBloc: todoListBloc
+      );
+      bloc.add(LoadItemEvent());
+      return bloc;
+    },
+    child: Theme(
+      child: TodoItemDetailScreen(),
+      data: themeFromPalette(todoListBloc?.color ?? Palette.blue),
+    ),
   );
 }
 

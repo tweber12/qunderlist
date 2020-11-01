@@ -51,20 +51,25 @@ class NotificationFFI {
 
   static NotificationFFI _notificationFFI;
 
-  factory NotificationFFI(BuildContext context) {
+  factory NotificationFFI() {
     if (_notificationFFI == null) {
-      _notificationFFI = NotificationFFI._internal(context);
+      _notificationFFI = NotificationFFI._internal();
     }
     return _notificationFFI;
   }
 
-  NotificationFFI._internal(this._context) {
+  NotificationFFI._internal(): _init = false;
+
+  BuildContext _context;
+  bool _init;
+
+  Future<void> init(BuildContext context) async {
+    if (_init) {
+      return;
+    }
+    _init = true;
+    _context = context;
     _setMethodCallHandler();
-  }
-
-  final BuildContext _context;
-
-  Future<void> init() async {
     var handle = PluginUtilities.getCallbackHandle(_backgroundCallback).toRawHandle();
     await _invoke(NOTIFICATION_FFI_INIT, handle);
     return ready();
@@ -140,7 +145,7 @@ class NotificationFFI {
     navigator.pushAndRemoveUntil(
         MaterialPageRoute(
             builder: (context) =>
-                showTodoListScreenExternal(context, repository, bloc)
+                showTodoListScreenExternal(context, bloc)
         ),
             (route) => route.settings.name == "/"
     );
@@ -148,7 +153,7 @@ class NotificationFFI {
       MaterialPageRoute(
           builder: (context) =>
               showTodoItemScreen(
-                  context, repository, itemId: itemId, todoListBloc: bloc)
+                  context, itemId: itemId, todoListBloc: bloc)
       ),
     );
   }
