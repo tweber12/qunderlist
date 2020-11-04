@@ -16,14 +16,10 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:qunderlist/blocs/todo_list.dart';
-import 'package:qunderlist/blocs/todo_lists.dart';
+import 'package:qunderlist/blocs/base.dart';
 import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
-import 'package:qunderlist/screens/todo_item_screen.dart';
-import 'package:qunderlist/screens/todo_list_screen.dart';
 
 const String NOTIFICATION_FFI_CHANNEL_NAME = "com.torweb.qunderlist.notification_ffi_channel";
 const String NOTIFICATION_FFI_BG_CHANNEL_NAME = "com.torweb.qunderlist.notification_ffi_background_channel";
@@ -51,25 +47,26 @@ class NotificationFFI {
 
   static NotificationFFI _notificationFFI;
 
-  factory NotificationFFI() {
+  factory NotificationFFI(TodoRepository repository, BaseBloc bloc) {
     if (_notificationFFI == null) {
-      _notificationFFI = NotificationFFI._internal();
+      _notificationFFI = NotificationFFI._internal(repository, bloc);
     }
     return _notificationFFI;
   }
 
-  NotificationFFI._internal(): _init = false;
+  NotificationFFI._internal(this.repository, this.bloc): _init = false {
+    _setMethodCallHandler();
+  }
 
-  BuildContext _context;
+  final TodoRepository repository;
+  final BaseBloc bloc;
   bool _init;
 
-  Future<void> init(BuildContext context) async {
+  Future<void> init() async {
     if (_init) {
       return;
     }
     _init = true;
-    _context = context;
-    _setMethodCallHandler();
     var handle = PluginUtilities.getCallbackHandle(_backgroundCallback).toRawHandle();
     await _invoke(NOTIFICATION_FFI_INIT, handle);
     return ready();
@@ -127,35 +124,18 @@ class NotificationFFI {
           _notificationCallback(id);
           break;
         case NOTIFICATION_FFI_COMPLETE_ITEM:
-          _completeItem(RepositoryProvider.of<TodoRepository>(_context), call.arguments as int);
+          _completeItem(repository, call.arguments as int);
           break;
         case NOTIFICATION_FFI_RESTORE_ALARMS:
-          _restoreAlarms(RepositoryProvider.of<TodoRepository>(_context));
+          _restoreAlarms(repository);
           break;
       }
     });
   }
 
   Future<void> _notificationCallback(int itemId) async {
-    var repository = RepositoryProvider.of<TodoRepository>(_context);
     var list = (await repository.getListsOfItem(itemId)).first;
-    var bloc = TodoListBloc(repository, list, filter: TodoStatusFilter.active, listsBloc: BlocProvider.of<TodoListsBloc>(_context));
-    bloc.add(GetDataEvent(filter: TodoStatusFilter.active));
-    var navigator = Navigator.of(_context);
-    navigator.pushAndRemoveUntil(
-        MaterialPageRoute(
-            builder: (context) =>
-                showTodoListScreenExternal(context, bloc)
-        ),
-            (route) => route.settings.name == "/"
-    );
-    navigator.push(
-      MaterialPageRoute(
-          builder: (context) =>
-              showTodoItemScreen(
-                  context, itemId: itemId, todoListBloc: bloc)
-      ),
-    );
+    bloc.add(BaseShowItemEvent(itemId, listId: list.id, list: list));
   }
 }
 

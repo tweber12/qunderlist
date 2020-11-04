@@ -299,12 +299,12 @@ packages:
     source: hosted
     version: "0.9.7"
   mockito:
-    dependency: transitive
+    dependency: "direct dev"
     description:
       name: mockito
       url: "https://pub.dartlang.org"
     source: hosted
-    version: "4.1.2"
+    version: "4.1.3"
   mutex:
     dependency: "direct main"
     description:

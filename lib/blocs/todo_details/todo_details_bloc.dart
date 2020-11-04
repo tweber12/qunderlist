@@ -66,7 +66,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
         _listBloc=listBloc,
         _baseItem=item,
         _itemId = itemId,
-        super(item==null ? TodoDetailsLoading() : item is TodoItem ? TodoDetailsFullyLoaded(item) : TodoDetailsLoadedShortItem(item))
+        super(item==null ? TodoDetailsLoading() : item is TodoItem ? TodoDetailsFullyLoaded(item, listBloc.color) : TodoDetailsLoadedShortItem(item, listBloc.color))
   {
     notifier = _listBloc!=null ? RateLimit(Duration(seconds: 1), _notifyHelper) : null;
     _updateStream = _repository.updateStream.listen((_) => add(ExternalUpdateEvent()));
@@ -74,6 +74,8 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
       _fullItem = _baseItem;
     }
   }
+
+  int get itemId => _itemId;
 
   @override
   Stream<TodoDetailsState> mapEventToState(TodoDetailsEvent event) async* {
@@ -117,17 +119,17 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapLoadItemEventToState(LoadItemEvent event) async* {
     if (_fullItem == null) {
       if (_baseItem != null) {
-        yield TodoDetailsLoadedShortItem(_baseItem);
+        yield TodoDetailsLoadedShortItem(_baseItem, _listBloc.color);
       }
       _fullItem = await _repository.getTodoItem(_itemId);
     }
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
   }
 
   Stream<TodoDetailsState> _mapUpdateTitleEventToState(UpdateTitleEvent event) async* {
     await _writeMutex.acquire();
     _fullItem = _fullItem.copyWith(todo: event.newTitle);
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
     updateReminders(_fullItem);
@@ -137,7 +139,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapUpdatePriorityEventToState(UpdatePriorityEvent event) async* {
     await _writeMutex.acquire();
     _fullItem = _fullItem.copyWith(priority: event.newPriority);
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
     _writeMutex.release();
@@ -146,7 +148,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapToggleCompletedEventToState(ToggleCompletedEvent event) async* {
     await _writeMutex.acquire();
     _fullItem = _fullItem.toggleCompleted();
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     if (_fullItem.completed) {
       cancelRemindersForItem(_fullItem, _repository);
       if (_fullItem.repeatedStatus == RepeatedStatus.active) {
@@ -168,7 +170,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapUpdateNoteEventToState(UpdateNoteEvent event) async* {
     await _writeMutex.acquire();
     _fullItem = _fullItem.copyWith(note: Nullable(event.newNote));
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
     updateReminders(_fullItem);
@@ -182,7 +184,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     } else {
       _fullItem = _fullItem.copyWith(dueDate: Nullable(event.newDueDate), repeated: Nullable(_fullItem.repeated?.copyWith(active: true)));
     }
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
     await _repository.updateRepeated(_fullItem.id, _fullItem.repeated);
@@ -199,7 +201,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     } else {
       _fullItem = _fullItem.copyWith(repeated: Nullable(event.repeated));
     }
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     if (dueDate != null) {
       await _repository.updateTodoItem(_fullItem);
@@ -214,7 +216,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     var newReminders = List.of(_fullItem.reminders);
     newReminders.add(event.reminder.withId(id));
     _fullItem = _fullItem.copyWith(reminders: newReminders);
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     NotificationFFI.setReminder(_fullItem, event.reminder.withId(id));
     _writeMutex.release();
@@ -224,7 +226,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     await _writeMutex.acquire();
     var newReminders = _fullItem.reminders.map((r) {return r.id == event.reminder.id ? event.reminder : r;}).toList();
     _fullItem = _fullItem.copyWith(reminders: newReminders);
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.updateReminder(event.reminder.id, event.reminder.at);
     NotificationFFI.updateReminder(_fullItem, event.reminder);
@@ -235,7 +237,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     await _writeMutex.acquire();
     var newReminders = _fullItem.reminders.where((element) => element.id != event.reminder.id).toList();
     _fullItem = _fullItem.copyWith(reminders: newReminders);
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.deleteReminder(event.reminder.id);
     NotificationFFI.cancelReminder(event.reminder.id);
@@ -246,7 +248,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     await _writeMutex.acquire();
     var lists = [_fullItem.onLists, event.list];
     _fullItem = _fullItem.copyWith(onLists: lists);
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.addTodoItemToList(_fullItem.id, event.list.id);
     _writeMutex.release();
@@ -256,7 +258,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     await _writeMutex.acquire();
     var lists = _fullItem.onLists.where((element) => element.id != event.listId).toList();
     _fullItem = _fullItem.copyWith(onLists: lists);
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.removeTodoItemFromList(_fullItem.id, event.listId);
     _writeMutex.release();
@@ -266,14 +268,14 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     await _writeMutex.acquire();
     var lists = [event.newList, ..._fullItem.onLists.where((element) => element.id != event.oldListId)];
     _fullItem = _fullItem.copyWith(onLists: lists);
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.moveTodoItemToList(_fullItem.id, event.oldListId, event.newList.id);
     _writeMutex.release();
   }
 
   Stream<TodoDetailsState> _mapCopyToListEventToState(CopyToListEvent event) async* {
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     _repository.addTodoItem(_fullItem, onList: event.list);
   }
@@ -286,7 +288,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
 
   Stream<TodoDetailsState> _externalUpdate(ExternalUpdateEvent event) async* {
     _fullItem = await _repository.getTodoItem(_itemId);
-    yield TodoDetailsFullyLoaded(_fullItem);
+    yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
   }
 
   Future<void> _notifyList() async {
@@ -294,7 +296,9 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   }
 
   void _notifyHelper() {
-    _listBloc.add(NotifyItemUpdateEvent(_fullItem.shorten()));
+    if (_fullItem != null) {
+      _listBloc.add(NotifyItemUpdateEvent(_fullItem.shorten()));
+    }
   }
 
   Future<void> updateReminders(TodoItem item) async {

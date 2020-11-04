@@ -15,13 +15,15 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:qunderlist/blocs/base.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/screens/cached_list.dart';
-import 'package:qunderlist/screens/todo_list_screen.dart';
 import 'package:qunderlist/theme.dart';
 
 class TodoListsScreen extends StatelessWidget {
+  TodoListsScreen();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -116,7 +118,9 @@ class TodoListCard extends StatelessWidget {
           Container(color: color, height: 1, margin: EdgeInsets.only(top: 41, left: 16, right: 16)),
         ]),
       ),
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => showTodoListScreen(ctx, list))),
+      onTap: () {
+        BlocProvider.of<BaseBloc>(context).add(BaseShowListEvent(list.id, list: list));
+      },
     );
   }
 }

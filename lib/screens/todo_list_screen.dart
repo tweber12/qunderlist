@@ -14,36 +14,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:qunderlist/blocs/base.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
-import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/screens/cached_list.dart';
-import 'package:qunderlist/screens/todo_item_screen.dart';
 import 'package:qunderlist/theme.dart';
 import 'package:qunderlist/widgets/change_text_dialog.dart';
 import 'package:qunderlist/widgets/confirm_dialog.dart';
 import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
-
-Widget showTodoListScreen<R extends TodoRepository>(BuildContext context, TodoList initialList) {
-  TodoStatusFilter initialFilter = TodoStatusFilter.active;
-  return BlocProvider<TodoListBloc>(
-    create: (context) {
-      var bloc = TodoListBloc(RepositoryProvider.of<TodoRepository>(context), initialList, listsBloc: BlocProvider.of<TodoListsBloc>(context));
-      bloc.add(GetDataEvent(filter: initialFilter));
-      return bloc;
-    },
-    child: TodoListScreen(initialFilter),
-  );
-}
-
-Widget showTodoListScreenExternal<R extends TodoRepository>(BuildContext context, TodoListBloc bloc) {
-  return BlocProvider<TodoListBloc>.value(
-    value: bloc,
-    child: TodoListScreen(bloc.filter),
-  );
-}
 
 class TodoListScreen extends StatefulWidget {
   final TodoStatusFilter filter;
@@ -86,7 +66,7 @@ class _TodoListScreenState extends State<TodoListScreen> {
         FloatingActionButton floatingActionButton;
         ThemeData theme;
         if (state is TodoListLoading) {
-            appBar = AppBar(title: Text(state.list.listName),);
+            appBar = AppBar(title: Text(state.list != null ? state.list.listName : "Qunderlist"),);
             body = LinearProgressIndicator();
             theme = themeFromPalette(state.list.color);
         } else if (state is TodoListLoadingFailed) {
@@ -165,12 +145,6 @@ class _TodoListScreenState extends State<TodoListScreen> {
       case TodoStatusFilter.withDueDate: return "No scheduled tasks";
       default: throw "BUG: Unsupported filter used in list screen";
     }
-  }
-
-  @override
-  void dispose() {
-    bloc.close();
-    super.dispose();
   }
 }
 
@@ -323,16 +297,7 @@ class TodoListItemCard extends StatelessWidget {
   }
 
   void _showDetails(BuildContext context) async {
-    await Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (ctx) => showTodoItemScreen(
-                ctx,
-                initialItem: item,
-                todoListBloc: BlocProvider.of<TodoListBloc>(context)
-            )
-        )
-    );
+    BlocProvider.of<BaseBloc>(context).add(BaseShowItemEvent(item.id));
   }
 }
 

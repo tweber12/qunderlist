@@ -16,7 +16,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:qunderlist/blocs/todo_details.dart';
-import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/theme.dart';
 import 'package:qunderlist/widgets/change_text_dialog.dart';
@@ -24,26 +23,6 @@ import 'package:qunderlist/widgets/date.dart';
 import 'package:qunderlist/widgets/priority.dart';
 import 'package:qunderlist/widgets/repeated.dart';
 import 'package:qunderlist/widgets/sliver_header.dart';
-
-Widget showTodoItemScreen<R extends TodoRepository>(BuildContext context, {int itemId, TodoItemBase initialItem, TodoListBloc todoListBloc}) {
-  assert(itemId != null || initialItem != null);
-  return BlocProvider<TodoDetailsBloc>(
-    create: (context) {
-      var bloc = TodoDetailsBloc(
-          RepositoryProvider.of<TodoRepository>(context),
-          itemId ?? initialItem.id,
-          item: initialItem,
-          listBloc: todoListBloc
-      );
-      bloc.add(LoadItemEvent());
-      return bloc;
-    },
-    child: Theme(
-      child: TodoItemDetailScreen(),
-      data: themeFromPalette(todoListBloc?.color ?? Palette.blue),
-    ),
-  );
-}
 
 class TodoItemDetailScreen extends StatelessWidget {
   @override
@@ -56,50 +35,57 @@ class TodoItemDetailScreen extends StatelessWidget {
           );
         }
         TodoItemBase item;
+        Palette theme;
         if (state is TodoDetailsLoadedShortItem) {
+          theme = state.theme;
           item = state.item;
         } else if (state is TodoDetailsFullyLoaded) {
+          theme = state.theme;
           item = state.item;
         }
-        return Scaffold(
-            body: CustomScrollView(
-              slivers: <Widget>[
-                SliverHeader(
-                  item.todo,
-                  dialogTitle: "Rename Task",
-                  onTitleChange: (title) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateTitleEvent(title)),
-                  actions: [InfoButton(item), ExtraActionsButton(item)],
-                ),
-                SliverList(
-                    delegate: SliverChildListDelegate([
-                      TodoItemDetailsLists(state),
-                      Divider(
-                        height: 8,
-                      ),
-                      TodoItemDetailsCompleted(item.completed),
-                      PriorityTile(item.priority, (priority) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdatePriorityEvent(priority))),
-                      Divider(),
-                      DueDateTile((date) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateDueDateEvent(date)), initialDate: item.dueDate),
-                      item is TodoItem ? RepeatedTile(
-                        onRepeatedChanged: (repeated) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateRepeatedEvent(repeated)),
-                        repeated: item.repeated,
-                        dueDate: item.dueDate,
-                      ) : CircularProgressIndicator(),
-                      item is TodoItem ? ReminderTile(
-                        item.reminders,
-                        (date) => BlocProvider.of<TodoDetailsBloc>(context).add(AddReminderEvent(Reminder(date))),
-                        (reminder) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateReminderEvent(reminder)),
-                        (reminder) => BlocProvider.of<TodoDetailsBloc>(context).add(DeleteReminderEvent(reminder)),
-                        allowUndo: true,
-                        startDate: item.dueDate,
-                      ) : CircularProgressIndicator(),
+        return Theme(
+            data: themeFromPalette(theme),
+            child: Scaffold(
+                body: CustomScrollView(
+                  slivers: <Widget>[
+                    SliverHeader(
+                      item.todo,
+                      dialogTitle: "Rename Task",
+                      onTitleChange: (title) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateTitleEvent(title)),
+                      actions: [InfoButton(item), ExtraActionsButton(item)],
+                    ),
+                    SliverList(
+                        delegate: SliverChildListDelegate([
+                          TodoItemDetailsLists(state),
+                          Divider(
+                            height: 8,
+                          ),
+                          TodoItemDetailsCompleted(item.completed),
+                          PriorityTile(item.priority, (priority) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdatePriorityEvent(priority))),
+                          Divider(),
+                          DueDateTile((date) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateDueDateEvent(date)), initialDate: item.dueDate),
+                          item is TodoItem ? RepeatedTile(
+                            onRepeatedChanged: (repeated) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateRepeatedEvent(repeated)),
+                            repeated: item.repeated,
+                            dueDate: item.dueDate,
+                          ) : CircularProgressIndicator(),
+                          item is TodoItem ? ReminderTile(
+                            item.reminders,
+                                (date) => BlocProvider.of<TodoDetailsBloc>(context).add(AddReminderEvent(Reminder(date))),
+                                (reminder) => BlocProvider.of<TodoDetailsBloc>(context).add(UpdateReminderEvent(reminder)),
+                                (reminder) => BlocProvider.of<TodoDetailsBloc>(context).add(DeleteReminderEvent(reminder)),
+                            allowUndo: true,
+                            startDate: item.dueDate,
+                          ) : CircularProgressIndicator(),
 //                      TodoItemDetailsReminders(item.reminders),
-                      Divider(),
-                      TodoItemDetailsNotes(item.note),
-                    ])
-                ),
-              ],
-            ));
+                          Divider(),
+                          TodoItemDetailsNotes(item.note),
+                        ])
+                    ),
+                  ],
+                )
+            )
+        );
       });
   }
 }

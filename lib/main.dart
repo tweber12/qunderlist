@@ -12,26 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:qunderlist/blocs/base.dart';
+import 'package:qunderlist/blocs/todo_details.dart';
+import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/notification_ffi.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
+import 'package:qunderlist/screens/todo_item_screen.dart';
+import 'package:qunderlist/screens/todo_list_screen.dart';
 import 'package:qunderlist/screens/todo_lists_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   var repository = await TodoRepositorySqflite.getInstance();
-  var notificationHandler = NotificationFFI();
+  var base = BaseBloc(repository);
+  var notificationHandler = NotificationFFI(repository, base);
   runApp(
       MultiRepositoryProvider(
           providers: [
             RepositoryProvider<TodoRepository>.value(value: repository),
             RepositoryProvider<NotificationFFI>.value(value: notificationHandler),
           ],
-          child: BlocProvider(
-            create: (ctx) => TodoListsBloc(repository),
+          child: BlocProvider.value(
+            value: base,
             child: MyApp(),
           )
       )
@@ -41,32 +48,135 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Qunderlist',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      home: AppInit(),
+      routerDelegate: TodoRouterDelegate(
+        RepositoryProvider.of<TodoRepository>(context),
+        BlocProvider.of<BaseBloc>(context)
+      ),
+      routeInformationParser: TodoRouteInformationParser(),
     );
   }
 }
 
-class AppInit extends StatefulWidget {
+class TodoRoutePath with EquatableMixin {
+  final int listId;
+  final int itemId;
+
+  TodoRoutePath.home():
+      listId = null,
+      itemId = null;
+
+  TodoRoutePath.list(int listId):
+      this.listId = listId,
+      itemId = null;
+
+  TodoRoutePath.item(int listId, int itemId):
+      this.listId = listId,
+      this.itemId = itemId;
+
+  bool get isHome => listId == null && itemId == null;
+  bool get isList => listId != null && itemId == null;
+  bool get isItem => listId != null && itemId != null;
+
   @override
-  _AppInitState createState() => _AppInitState();
+  List<Object> get props => [listId, itemId];
 }
 
-class _AppInitState extends State<AppInit> {
-  @override
-  void initState() {
-    super.initState();
-    RepositoryProvider.of<NotificationFFI>(context).init(context);
-    BlocProvider.of<TodoListsBloc>(context).add(LoadTodoListsEvent());
+class TodoRouterDelegate extends RouterDelegate<TodoRoutePath> with ChangeNotifier, PopNavigatorRouterDelegateMixin<TodoRoutePath>{
+  final GlobalKey<NavigatorState> navigatorKey;
+  final TodoRepository repository;
+
+  final BaseBloc _bloc;
+  BaseState _state;
+
+  TodoRouterDelegate(this.repository, BaseBloc bloc):
+        _bloc = bloc,
+        navigatorKey = GlobalKey<NavigatorState>()
+  {
+    _state = bloc.state;
+    bloc.listen((state) async {
+      _state = state;
+      notifyListeners();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return TodoListsScreen();
+    return Navigator(
+      key: navigatorKey,
+      pages: [
+        MaterialPage(
+          child: BlocProvider<TodoListsBloc>.value(
+              value: _state.listsBloc,
+              child: TodoListsScreen()
+          )
+        ),
+        if (_state.listId != null)
+          MaterialPage(
+            child: BlocProvider<TodoListBloc>.value(
+              value: _state.listBloc,
+              child: TodoListScreen(TodoStatusFilter.active)
+            )
+          ),
+        if (_state.itemId != null)
+          MaterialPage(
+              child: BlocProvider<TodoDetailsBloc>.value(
+                value: _state.itemBloc,
+                child: TodoItemDetailScreen()
+              )
+          )
+      ],
+      onPopPage: (route, result) {
+        if (!route.didPop(result)) {
+          return false;
+        }
+        _bloc.add(BasePopEvent());
+        return true;
+      },
+    );
+  }
+
+  @override
+  Future<void> setNewRoutePath(TodoRoutePath configuration) async {
+    if (configuration.isHome) {
+      _bloc.add(BaseShowHomeEvent());
+    } else if (configuration.isList) {
+      _bloc.add(BaseShowListEvent(configuration.listId));
+    } else {
+      _bloc.add(BaseShowItemEvent(configuration.itemId, listId: configuration.listId));
+    }
+  }
+}
+
+class TodoRouteInformationParser extends RouteInformationParser<TodoRoutePath> {
+  @override
+  Future<TodoRoutePath> parseRouteInformation(RouteInformation routeInformation) async {
+    final uri = Uri.parse(routeInformation.location);
+    if (uri.pathSegments.length == 0) {
+      return TodoRoutePath.home();
+    }
+    if (uri.pathSegments[0] == "list") {
+      return TodoRoutePath.list(int.parse(uri.pathSegments[1]));
+    } else if (uri.pathSegments[1] == "item") {
+      return TodoRoutePath.item(int.parse(uri.pathSegments[1]), int.parse(uri.pathSegments[2]));
+    }
+    throw "BUG: Malformed path";
+  }
+
+  @override
+  RouteInformation restoreRouteInformation(TodoRoutePath configuration) {
+    if (configuration.isHome) {
+      return RouteInformation(location: "/");
+    } else if (configuration.isList) {
+      return RouteInformation(location: "/list/${configuration.listId}");
+    } else if (configuration.isItem) {
+      return RouteInformation(location: "/item/${configuration.listId}/${configuration.itemId}");
+    }
+    throw "BUG: Unhandled route";
   }
 }

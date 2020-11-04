@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import 'package:equatable/equatable.dart';
+import 'package:flutter/material.dart';
 import 'package:qunderlist/repository/repository.dart';
 
 abstract class TodoDetailsState with EquatableMixin {
@@ -27,16 +28,19 @@ class TodoDetailsLoading extends TodoDetailsState {
 
 class TodoDetailsLoadedShortItem extends TodoDetailsState {
   final TodoItemBase item;
-  TodoDetailsLoadedShortItem(this.item);
+  final Palette theme;
+
+  TodoDetailsLoadedShortItem(this.item, this.theme);
 
   @override
-  List<Object> get props => [item];
+  List<Object> get props => [item, theme];
 }
 
 class TodoDetailsFullyLoaded extends TodoDetailsState {
   final TodoItem item;
-  TodoDetailsFullyLoaded(this.item);
+  final Palette theme;
+  TodoDetailsFullyLoaded(this.item, this.theme);
 
   @override
-  List<Object> get props => [item];
+  List<Object> get props => [item, this.theme];
 }

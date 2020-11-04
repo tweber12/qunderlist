@@ -28,13 +28,15 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   R _repository;
   TodoListsBloc _listsBloc;
   TodoList _list;
+  int _listId;
   // Ensure that only one process modifies the cache and db at the same time
   // This is done to avoid problems with the db and the cache getting out of sync
   final Mutex _writeMutex = Mutex();
   StreamSubscription<ExternalUpdate> _updateStream;
-  TodoListBloc(R repository, TodoList list, {TodoStatusFilter filter: TodoStatusFilter.active, TodoListsBloc listsBloc}):
+  TodoListBloc(R repository, int listId, {TodoList list, TodoStatusFilter filter: TodoStatusFilter.active, TodoListsBloc listsBloc}):
         _repository=repository,
         _listsBloc=listsBloc,
+        _listId = listId,
         _list=list,
         this.filter=filter,
         super(TodoListLoading(list))
@@ -46,8 +48,8 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   TodoStatusFilter filter;
   TodoListOrdering ordering;
 
-  int get listId => _list.id;
-  Palette get color => _list.color;
+  int get listId => _listId;
+  Palette get color => _list?.color ?? Palette.blue;
 
   @override
   Stream<TodoListStates> mapEventToState(TodoListEvent event) async* {
@@ -101,6 +103,9 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     _notifyListsBloc();
   }
   Stream<TodoListStates> _mapGetDataEventToState(GetDataEvent event) async* {
+    if (_list == null) {
+      _list = await _repository.getTodoList(_listId);
+    }
     yield* _updateCacheWithFilter(event.filter);
   }
   Stream<TodoListStates> _mapNotifyItemUpdateEventToState(NotifyItemUpdateEvent event) async* {
