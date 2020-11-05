@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:qunderlist/blocs/base.dart';
+import 'package:qunderlist/blocs/repeated.dart';
 import 'package:qunderlist/notification_ffi.dart';
 import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
+import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -18,13 +20,14 @@ void main() {
       String channelName,
       Function(int) notificationCallback,
       Function(int) completeItemCallback,
-      Function() restoreAlarmsCallback
+      Function() restoreAlarmsCallback,
+      Function(int) createNextCallback,
     }) {
-      ffi = MockNotificationFFI(notificationCallback, completeItemCallback, restoreAlarmsCallback);
+      ffi = MockNotificationFFI(notificationCallback, completeItemCallback, restoreAlarmsCallback, createNextCallback);
       return ffi;
     }
 
-    setUp(() {
+    setUp(() async {
       repository = MockTodoRepository();
       notificationHandler = NotificationHandler.foreground(repository);
       notificationHandler.init(bloc, initializer: initMockFFI);
@@ -60,7 +63,7 @@ void main() {
           Reminder(DateTime(2020, 10, 3, 10, 19), id: 7)
         ];
         var item = TodoItem("test", DateTime.now(), reminders: reminders);
-        await notificationHandler.setRemindersForItem(item, repository);
+        await notificationHandler.setRemindersForItem(item);
         verifyZeroInteractions(repository);
         verify(ffi.setReminder(item, reminders[0]));
         verify(ffi.setReminder(item, reminders[1]));
@@ -74,7 +77,7 @@ void main() {
         ];
         var item = TodoItemShort("test", DateTime.now(), id: 3, nActiveReminders: 0);
         when(repository.getRemindersForItem(item.id)).thenAnswer((_) => Future.value(reminders));
-        await notificationHandler.setRemindersForItem(item, repository);
+        await notificationHandler.setRemindersForItem(item);
         verify(repository.getRemindersForItem(item.id));
         verify(ffi.setReminder(item, reminders[0]));
         verify(ffi.setReminder(item, reminders[1]));
@@ -87,7 +90,7 @@ void main() {
           Reminder(DateTime(2020, 10, 3, 10, 19), id: 7)
         ];
         var item = TodoItem("test", DateTime.now(), reminders: reminders);
-        await notificationHandler.cancelRemindersForItem(item, repository);
+        await notificationHandler.cancelRemindersForItem(item);
         verifyZeroInteractions(repository);
         verify(ffi.cancelReminder(reminders[0].id));
         verify(ffi.cancelReminder(reminders[1].id));
@@ -101,7 +104,7 @@ void main() {
         ];
         var item = TodoItemShort("test", DateTime.now(), id: 3, nActiveReminders: 0);
         when(repository.getRemindersForItem(item.id)).thenAnswer((_) => Future.value(reminders));
-        await notificationHandler.cancelRemindersForItem(item, repository);
+        await notificationHandler.cancelRemindersForItem(item);
         verify(repository.getRemindersForItem(item.id));
         verify(ffi.cancelReminder(reminders[0].id));
         verify(ffi.cancelReminder(reminders[1].id));
@@ -115,11 +118,94 @@ void main() {
         ];
         var list = TodoList("foo", Palette.blue, id: 3);
         when(repository.getActiveRemindersForList(list.id)).thenAnswer((_) => Future.value(reminders));
-        await notificationHandler.cancelRemindersForList(list, repository);
+        await notificationHandler.cancelRemindersForList(list);
         verify(repository.getActiveRemindersForList(list.id));
         verify(ffi.cancelReminder(reminders[0].id));
         verify(ffi.cancelReminder(reminders[1].id));
         verifyNoMoreInteractions(ffi);
+      });
+
+      test("setPendingItem with next after due date", () async {
+        var repeated = Repeated(true, true, false, true, RepeatedStepDaily(3));
+        var reminders = [
+          Reminder(DateTime(2020, 11, 5, 9, 47), id: 9),
+          Reminder(DateTime(2020, 11, 9, 10, 19), id: 7)
+        ];
+        var item = TodoItem("title", DateTime.now(), dueDate: DateTime(2020, 11, 3), id: 7, repeated: repeated, reminders: reminders);
+        var next = nextItem(item);
+        await notificationHandler.setPendingItem(item, next: next);
+        verify(ffi.setPendingItemAlarm(alarmId(item.id), item.id, DateTime(2020, 11, 4)));
+        verify(ffi.setReminder(next, next.reminders[0].withId(reminderId(reminders[0].id))));
+        verify(ffi.setReminder(next, next.reminders[1].withId(reminderId(reminders[1].id))));
+      });
+
+      test("setPendingItem with next before due date", () async {
+        var repeated = Repeated(true, true, false, true, RepeatedStepDaily(3));
+        var reminders = [
+          Reminder(DateTime(2020, 11, 5, 9, 47), id: 9),
+          Reminder(DateTime(2020, 11, 9, 10, 19), id: 7)
+        ];
+        var item = TodoItem("title", DateTime.now(), dueDate: DateTime(2020, 11, 13), id: 7, repeated: repeated, reminders: reminders);
+        var next = nextItem(item);
+        await notificationHandler.setPendingItem(item, next: next);
+        verify(ffi.setPendingItemAlarm(alarmId(item.id), item.id, DateTime(2020, 11, 8)));
+        verify(ffi.setReminder(next, next.reminders[0].withId(reminderId(reminders[0].id))));
+        verify(ffi.setReminder(next, next.reminders[1].withId(reminderId(reminders[1].id))));
+      });
+
+      test("setPendingItem without next after due date", () async {
+        var repeated = Repeated(true, true, false, true, RepeatedStepDaily(3));
+        var reminders = [
+          Reminder(DateTime(2020, 11, 5, 9, 47), id: 9),
+          Reminder(DateTime(2020, 11, 9, 10, 19), id: 7)
+        ];
+        var item = TodoItem("title", DateTime.now(), dueDate: DateTime(2020, 11, 3), id: 7, repeated: repeated, reminders: reminders);
+        var next = nextItem(item);
+        await notificationHandler.setPendingItem(item);
+        verify(ffi.setPendingItemAlarm(alarmId(item.id), item.id, DateTime(2020, 11, 4)));
+        verify(ffi.setReminder(any, next.reminders[0].withId(reminderId(reminders[0].id))));
+        verify(ffi.setReminder(any, next.reminders[1].withId(reminderId(reminders[1].id))));
+      });
+
+      test("setPendingItem without next after due date", () async {
+        var repeated = Repeated(true, true, false, true, RepeatedStepDaily(3));
+        var reminders = [
+          Reminder(DateTime(2020, 11, 5, 9, 47), id: 9),
+          Reminder(DateTime(2020, 11, 9, 10, 19), id: 7)
+        ];
+        var item = TodoItem("title", DateTime.now(), dueDate: DateTime(2020, 11, 13), id: 7, repeated: repeated, reminders: reminders);
+        var next = nextItem(item);
+        await notificationHandler.setPendingItem(item);
+        verify(ffi.setPendingItemAlarm(alarmId(item.id), item.id, DateTime(2020, 11, 8)));
+        verify(ffi.setReminder(any, next.reminders[0].withId(reminderId(reminders[0].id))));
+        verify(ffi.setReminder(any, next.reminders[1].withId(reminderId(reminders[1].id))));
+      });
+
+      test("cancelPendingItem with next", () async {
+        var repeated = Repeated(true, true, false, true, RepeatedStepDaily(3));
+        var reminders = [
+          Reminder(DateTime(2020, 11, 5, 9, 47), id: 9),
+          Reminder(DateTime(2020, 11, 9, 10, 19), id: 7)
+        ];
+        var item = TodoItem("title", DateTime.now(), dueDate: DateTime(2020, 11, 3), id: 7, repeated: repeated, reminders: reminders);
+        var next = nextItem(item);
+        await notificationHandler.cancelPendingItem(item, next: next);
+        verify(ffi.cancelPendingItemAlarm(alarmId(item.id)));
+        verify(ffi.cancelReminder(reminderId(reminders[0].id)));
+        verify(ffi.cancelReminder(reminderId(reminders[1].id)));
+      });
+
+      test("cancelPendingItem without next", () async {
+        var repeated = Repeated(true, true, false, true, RepeatedStepDaily(3));
+        var reminders = [
+          Reminder(DateTime(2020, 11, 5, 9, 47), id: 9),
+          Reminder(DateTime(2020, 11, 9, 10, 19), id: 7)
+        ];
+        var item = TodoItem("title", DateTime.now(), dueDate: DateTime(2020, 11, 3), id: 7, repeated: repeated, reminders: reminders);
+        await notificationHandler.cancelPendingItem(item);
+        verify(ffi.cancelPendingItemAlarm(alarmId(item.id)));
+        verify(ffi.cancelReminder(reminderId(reminders[0].id)));
+        verify(ffi.cancelReminder(reminderId(reminders[1].id)));
       });
     });
     
@@ -197,6 +283,127 @@ void main() {
         verify(ffi.setReminder(items[2], reminders[4]));
         verifyNoMoreInteractions(ffi);
       });
+
+      test("create next", () async {
+        var itemId = 7;
+        var repeated = Repeated(true, true, false, true, RepeatedStepDaily(3));
+        var now = DateTime.now();
+        var nowDay = DateTime(now.year, now.month, now.day);
+        var reminders = [
+          Reminder(nowDay.add(Duration(days: 5, hours: 8, minutes: 24)), id: 9),
+          Reminder(nowDay.add(Duration(days: 8, hours: 14, minutes: 45)), id: 7)
+        ];
+        var dueDate = nowDay.add(Duration(days: 2));
+        var item = TodoItem("title", DateTime.now(), dueDate: dueDate, id: itemId, repeated: repeated, reminders: reminders);
+        var nextId = 8;
+        var nextReminders = [
+          Reminder(reminders[0].at.add(Duration(days: 3)), id: 12),
+          Reminder(reminders[1].at.add(Duration(days: 3)), id: 13)
+        ];
+        var next = TodoItem("title", DateTime.now(), dueDate: item.dueDate.add(Duration(days: 3)), id: nextId, repeated: repeated, reminders: nextReminders);
+        when(repository.getTodoItem(itemId)).thenAnswer((_) => Future.value(item));
+        when(repository.addTodoItem(any)).thenAnswer((_) => Future.value(next));
+        await ffi.createNextCallback(itemId);
+        verify(repository.getTodoItem(itemId));
+        var added = verify(repository.addTodoItem(captureAny)).captured.single;
+        expect(added.todo, item.todo);
+        expect(added.repeated, item.repeated);
+        expect(added.dueDate, next.dueDate);
+        expect(added.reminders[0].at, nextReminders[0].at);
+        expect(added.reminders[1].at, nextReminders[1].at);
+        verify(ffi.cancelReminder(reminderId(reminders[0].id)));
+        verify(ffi.cancelReminder(reminderId(reminders[1].id)));
+        verify(ffi.setReminder(next, nextReminders[0]));
+        verify(ffi.setReminder(next, nextReminders[1]));
+        verify(ffi.setPendingItemAlarm(alarmId(next.id), next.id, next.dueDate.add(Duration(days: 1))));
+        verifyNoMoreInteractions(repository);
+      });
+
+      test("create next auto complete", () async {
+        var itemId = 7;
+        var repeated = Repeated(true, true, true, true, RepeatedStepDaily(3));
+        var now = DateTime.now();
+        var nowDay = DateTime(now.year, now.month, now.day);
+        var reminders = [
+          Reminder(nowDay.add(Duration(days: 5, hours: 8, minutes: 24)), id: 9),
+          Reminder(nowDay.add(Duration(days: 8, hours: 14, minutes: 45)), id: 7)
+        ];
+        var dueDate = nowDay.add(Duration(days: 2));
+        var item = TodoItem("title", DateTime.now(), dueDate: dueDate, id: itemId, repeated: repeated, reminders: reminders);
+        var nextId = 8;
+        var nextReminders = [
+          Reminder(reminders[0].at.add(Duration(days: 3)), id: 12),
+          Reminder(reminders[1].at.add(Duration(days: 3)), id: 13)
+        ];
+        var next = TodoItem("title", DateTime.now(), dueDate: item.dueDate.add(Duration(days: 3)), id: nextId, repeated: repeated, reminders: nextReminders);
+        when(repository.getTodoItem(itemId)).thenAnswer((_) => Future.value(item));
+        when(repository.addTodoItem(any)).thenAnswer((_) => Future.value(next));
+        await ffi.createNextCallback(itemId);
+        verify(repository.getTodoItem(itemId));
+        var completed = verify(repository.updateTodoItem(captureAny)).captured.single;
+        expect(completed.id, item.id);
+        expect(completed.completedOn, isNotNull);
+        var added = verify(repository.addTodoItem(captureAny)).captured.single;
+        expect(added.todo, item.todo);
+        expect(added.repeated, item.repeated);
+        expect(added.dueDate, next.dueDate);
+        expect(added.reminders[0].at, nextReminders[0].at);
+        expect(added.reminders[1].at, nextReminders[1].at);
+        verify(ffi.cancelReminder(reminderId(reminders[0].id)));
+        verify(ffi.cancelReminder(reminderId(reminders[1].id)));
+        verify(ffi.setReminder(next, nextReminders[0]));
+        verify(ffi.setReminder(next, nextReminders[1]));
+        verify(ffi.setPendingItemAlarm(alarmId(next.id), next.id, next.dueDate.add(Duration(days: 1))));
+        verifyNoMoreInteractions(repository);
+      });
+
+      test("create next auto complete no history", () async {
+        var itemId = 7;
+        var repeated = Repeated(true, true, true, false, RepeatedStepDaily(3));
+        var now = DateTime.now();
+        var nowDay = DateTime(now.year, now.month, now.day);
+        var reminders = [
+          Reminder(nowDay.add(Duration(days: 5, hours: 8, minutes: 24)), id: 9),
+          Reminder(nowDay.add(Duration(days: 8, hours: 14, minutes: 45)), id: 7)
+        ];
+        var dueDate = nowDay.add(Duration(days: 2));
+        var item = TodoItem("title", DateTime.now(), dueDate: dueDate, id: itemId, repeated: repeated, reminders: reminders);
+        var nextId = 8;
+        var nextReminders = [
+          Reminder(reminders[0].at.add(Duration(days: 3)), id: 12),
+          Reminder(reminders[1].at.add(Duration(days: 3)), id: 13)
+        ];
+        var next = TodoItem("title", DateTime.now(), dueDate: item.dueDate.add(Duration(days: 3)), id: nextId, repeated: repeated, reminders: nextReminders);
+        when(repository.getTodoItem(itemId)).thenAnswer((_) => Future.value(item));
+        when(repository.addTodoItem(any)).thenAnswer((_) => Future.value(next));
+        await ffi.createNextCallback(itemId);
+        verify(repository.getTodoItem(itemId));
+        verify(repository.deleteTodoItem(item.id));
+        var added = verify(repository.addTodoItem(captureAny)).captured.single;
+        expect(added.todo, item.todo);
+        expect(added.repeated, item.repeated);
+        expect(added.dueDate, next.dueDate);
+        expect(added.reminders[0].at, nextReminders[0].at);
+        expect(added.reminders[1].at, nextReminders[1].at);
+        verify(ffi.cancelReminder(reminderId(reminders[0].id)));
+        verify(ffi.cancelReminder(reminderId(reminders[1].id)));
+        verify(ffi.setReminder(next, nextReminders[0]));
+        verify(ffi.setReminder(next, nextReminders[1]));
+        verify(ffi.setPendingItemAlarm(alarmId(next.id), next.id, next.dueDate.add(Duration(days: 1))));
+        verifyNoMoreInteractions(repository);
+      });
+    });
+
+    group("ids", () {
+      test("alarm id", () {
+        var id = 9;
+        expect(alarmId(id), 0x40000009);
+      });
+
+      test("reminder id", () {
+        var id = 9;
+        expect(reminderId(id), 0x80000009);
+      });
     });
   });
 }
@@ -206,7 +413,8 @@ class MockNotificationFFI extends Mock implements NotificationFFI {
   Function(int) notificationCallback;
   Function(int) completeItemCallback;
   Function() restoreAlarmsCallback;
+  Function(int) createNextCallback;
   
-  MockNotificationFFI(this.notificationCallback, this.completeItemCallback, this.restoreAlarmsCallback);
+  MockNotificationFFI(this.notificationCallback, this.completeItemCallback, this.restoreAlarmsCallback, this.createNextCallback);
 }
 class MockBaseBloc extends Mock implements BaseBloc {}

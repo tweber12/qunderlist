@@ -162,4 +162,7 @@ class TodoRepositorySqflite extends TodoRepository {
 
   @override
   Future<List<TodoList>> getListsOfItem(int itemId) => listItemDao.getListsOfItem(itemId);
+
+  @override
+  Future<List<int>> getPendingItems({int listId}) => listItemDao.getPendingItems(listId: listId);
 }

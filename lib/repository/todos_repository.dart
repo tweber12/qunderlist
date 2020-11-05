@@ -77,4 +77,5 @@ abstract class TodoRepository {
   Future<int> getNumberOfTodoItems(int listId, TodoStatusFilter filter);
   Future<List<TodoItemShort>> getTodoItemsOfListChunk(int listId, int start, int end, TodoStatusFilter filter);
   Future<List<TodoList>> getListsOfItem(int itemId);
+  Future<List<int>> getPendingItems({int listId});
 }

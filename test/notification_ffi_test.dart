@@ -103,6 +103,38 @@ void main() {
       notificationFFI.cancelReminder(9);
       expect(deleteReminderArgs, 9);
     });
+
+    test("setPendingItemAlarm", () {
+      var pendingItemArgs;
+      notificationFFI.setMockMethodCallHandler((call) {
+        if (call.method == NOTIFICATION_FFI_SET_NEXT) {
+          pendingItemArgs = call.arguments;
+        } else {
+          throw call.method;
+        }
+      });
+      var date = DateTime.now();
+      var createId = 7;
+      var baseItemId = 9;
+      notificationFFI.setPendingItemAlarm(createId, baseItemId, date);
+      expect(pendingItemArgs[NOTIFICATION_FFI_PENDING_ALARM_ID], createId);
+      expect(pendingItemArgs[NOTIFICATION_FFI_ITEM_ID], baseItemId);
+      expect(pendingItemArgs[NOTIFICATION_FFI_PENDING_ALARM_TIME], date.millisecondsSinceEpoch);
+    });
+
+    test("cancelPendingItemAlarm", () {
+      var pendingItemArgs;
+      notificationFFI.setMockMethodCallHandler((call) {
+        if (call.method == NOTIFICATION_FFI_DELETE_NEXT) {
+          pendingItemArgs = call.arguments;
+        } else {
+          throw call.method;
+        }
+      });
+      var createId = 7;
+      notificationFFI.cancelPendingItemAlarm(createId);
+      expect(pendingItemArgs, createId);
+    });
   });
 
   group("receive", () {
@@ -110,16 +142,19 @@ void main() {
     int callbackId;
     int completeId;
     bool restoreCalled;
+    int nextId;
 
     setUp(() {
       callbackId = null;
       completeId = null;
       restoreCalled = false;
+      nextId = null;
       notificationFFI = NotificationFFI(
           channelName: "test_channel_receive",
           notificationCallback: (int itemId) { callbackId = itemId; },
           completeItemCallback: (int itemId) { completeId = itemId; },
           restoreAlarmsCallback: () { restoreCalled = true; },
+          createNextCallback: (int itemId) { nextId = itemId; },
       );
     });
 
@@ -128,6 +163,7 @@ void main() {
       expect(callbackId, 7);
       expect(completeId, null);
       expect(restoreCalled, false);
+      expect(nextId, null);
     });
 
     test("completeItem", () {
@@ -135,6 +171,7 @@ void main() {
       expect(callbackId, null);
       expect(completeId, 3);
       expect(restoreCalled, false);
+      expect(nextId, null);
     });
 
     test("restoreAlarms", () {
@@ -142,6 +179,15 @@ void main() {
       expect(callbackId, null);
       expect(completeId, null);
       expect(restoreCalled, true);
+      expect(nextId, null);
+    });
+
+    test("createNext", () {
+      notificationFFI.methodCallHandler(MethodCall(NOTIFICATION_FFI_CREATE_NEXT, 8));
+      expect(callbackId, null);
+      expect(completeId, null);
+      expect(restoreCalled, false);
+      expect(nextId, 8);
     });
   });
 }

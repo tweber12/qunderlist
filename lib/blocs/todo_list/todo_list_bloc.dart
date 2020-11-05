@@ -99,7 +99,12 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     _writeMutex.release();
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {
-    await _notificationHandler.cancelRemindersForList(_list, _repository);
+    await _notificationHandler.cancelRemindersForList(_list);
+    var autoCompleting = await _repository.getPendingItems(listId: _list.id);
+    for (final i in autoCompleting) {
+      var item = await _repository.getTodoItem(i);
+      _notificationHandler.cancelPendingItem(item);
+    }
     await _repository.deleteTodoList(_list.id);
     yield TodoListDeleted();
     _notifyListsBloc();
@@ -121,7 +126,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     var item = await _repository.addTodoItem(event.item, onList: _list);
     cache = cache.addElementAtEnd(item.shorten());
     yield TodoListLoaded(_list, cache);
-    _notificationHandler.setRemindersForItem(item, _repository);
+    _notificationHandler.setRemindersForItem(item);
     _notifyListsBloc();
     _writeMutex.release();
   }
@@ -137,7 +142,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       // No other lists contain this item, so delete it and all it's reminders
       var full = await _repository.getTodoItem(event.item.id);
       await _repository.deleteTodoItem(event.item.id);
-      _notificationHandler.cancelRemindersForItem(full, _repository);
+      _notificationHandler.cancelRemindersForItem(full);
     }
     _notifyListsBloc();
     _writeMutex.release();
@@ -151,10 +156,12 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     yield TodoListLoaded(_list, cache);
     if (newItem.completed) {
       // The event has been completed, so remove all notifications
-      _notificationHandler.cancelRemindersForItem(event.item, _repository);
+      _notificationHandler.cancelRemindersForItem(event.item);
+      _notificationHandler.cancelPendingItem(await _repository.getTodoItem(event.item.id));
     } else {
       // The event has been activated again, so activate all notifications as well
-      _notificationHandler.setRemindersForItem(event.item, _repository);
+      _notificationHandler.setRemindersForItem(event.item);
+      _notificationHandler.setPendingItem(await _repository.getTodoItem(event.item.id));
     }
     if (newItem.completed && newItem.repeatedStatus == RepeatedStatus.active) {
       // The item is repeated

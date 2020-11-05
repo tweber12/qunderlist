@@ -125,6 +125,25 @@ class TodoListItemDao {
     return firstIntValue(results);
   }
 
+  Future<List<int>> getPendingItems({int listId}) async {
+    List<Map<String,dynamic>> results;
+    if (listId == null) {
+      results = await _db.query(
+          TODO_ITEMS_TABLE,
+          where: "$TODO_ITEM_COMPLETED_DATE=null and $TODO_ITEM_REPEAT_ACTIVE=true and $TODO_ITEM_REPEAT_AUTO_ADVANCE=true"
+      );
+    } else {
+      results = await _db.rawQuery("""
+          select $ID
+            from $TODO_ITEMS_TABLE
+                 join $TODO_LIST_ITEMS_TABLE
+                 on $ID = $TODO_LIST_ITEMS_ITEM
+           where $TODO_ITEM_COMPLETED_DATE=null and $TODO_ITEM_REPEAT_ACTIVE=true and $TODO_ITEM_REPEAT_AUTO_ADVANCE=true and $TODO_LIST_ITEMS_LIST = ?
+        """, [listId]);
+    }
+    return results.map((r) => r[ID] as int).toList();
+  }
+
   Future<void> _getMaxOrdering() async {
     var results = await _db.rawQuery("""
         select $TODO_LIST_ITEMS_LIST, max($TODO_LIST_ITEMS_ORDERING)

@@ -20,7 +20,12 @@ import 'package:qunderlist/notification_ffi.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 
-typedef FfiInit = NotificationFFI Function({@required String channelName, Function(int) notificationCallback, Function(int) completeItemCallback, Function() restoreAlarmsCallback});
+import 'blocs/repeated.dart';
+
+const int PENDING_ITEM_CREATE_PREFIX = 1<<30;
+const int PENDING_ITEM_NOTIFICATION_PREFIX = 1<<31;
+
+typedef FfiInit = NotificationFFI Function({@required String channelName, Function(int) notificationCallback, Function(int) completeItemCallback, Function() restoreAlarmsCallback, Function(int) createNextCallback});
 
 class NotificationHandler {
   final bool foreground;
@@ -43,7 +48,8 @@ class NotificationHandler {
           channelName: NOTIFICATION_FFI_CHANNEL_NAME,
           notificationCallback: _notificationCallback,
           completeItemCallback: _completeItemCallback,
-          restoreAlarmsCallback: _restoreAlarmsCallback
+          restoreAlarmsCallback: _restoreAlarmsCallback,
+          createNextCallback: _createNext
       );
       var handle = PluginUtilities.getCallbackHandle(_backgroundCallback).toRawHandle();
       return _notificationFFI.init(handle);
@@ -68,7 +74,7 @@ class NotificationHandler {
     if (item.completed) {
       return;
     }
-    await cancelRemindersForItem(item, repository);
+    await cancelRemindersForItem(item);
     var newItem = item.toggleCompleted();
     await repository.updateTodoItem(newItem);
     repository.triggerUpdate();
@@ -86,6 +92,20 @@ class NotificationHandler {
     }
   }
 
+  Future<void> _createNext(int itemId) async {
+    var item = await repository.getTodoItem(itemId);
+    if (item.repeated.autoComplete) {
+      if (item.repeated.keepHistory) {
+        await repository.updateTodoItem(item.toggleCompleted());
+      } else {
+        await repository.deleteTodoItem(item.id);
+      }
+    }
+    var next = await repository.addTodoItem(nextItem(item));
+    await _replaceRemindersForPendingItem(item, next);
+    await setPendingItem(next);
+  }
+
   Future<void> setReminder(TodoItemBase item, Reminder reminder) {
     return _notificationFFI.setReminder(item, reminder);
   }
@@ -98,7 +118,7 @@ class NotificationHandler {
     return _notificationFFI.cancelReminder(reminderId);
   }
 
-  Future<void> setRemindersForItem<R extends TodoRepository>(TodoItemBase item, R repository) async {
+  Future<void> setRemindersForItem(TodoItemBase item) async {
     List<Reminder> reminders;
     if (item is TodoItem) {
       reminders = item.reminders;
@@ -110,7 +130,7 @@ class NotificationHandler {
     }
   }
 
-  Future<void> cancelRemindersForItem<R extends TodoRepository>(TodoItemBase item, R repository) async {
+  Future<void> cancelRemindersForItem(TodoItemBase item) async {
     List<Reminder> reminders;
     if (item is TodoItem) {
       reminders = item.reminders;
@@ -122,12 +142,92 @@ class NotificationHandler {
     }
   }
 
-  Future<void> cancelRemindersForList<R extends TodoRepository>(TodoList list, R repository) async {
+  Future<void> cancelRemindersForList(TodoList list) async {
     var reminders = await repository.getActiveRemindersForList(list.id);
     for (final reminder in reminders) {
       await _notificationFFI.cancelReminder(reminder.id);
     }
   }
+
+  Future<void> setPendingItem(TodoItem basis, {TodoItem next}) async {
+    if (next == null) {
+      if (basis.repeatedStatus != RepeatedStatus.active || basis.repeated.autoAdvance == false) {
+        return;
+      }
+      next = nextItem(basis);
+    }
+    _setRemindersForPendingItem(basis, next);
+    _notificationFFI.setPendingItemAlarm(alarmId(basis.id), basis.id, _dateForPendingItemCreation(basis, next));
+  }
+
+  Future<void> cancelPendingItem(TodoItem basis, {TodoItem next}) async {
+    if (next == null) {
+      if (basis.repeatedStatus != RepeatedStatus.active || basis.repeated.autoAdvance == false) {
+        return;
+      }
+      next = nextItem(basis);
+    }
+    _cancelRemindersForPendingItem(basis);
+    _notificationFFI.cancelPendingItemAlarm(alarmId(basis.id));
+  }
+
+  DateTime _dateForPendingItemCreation(TodoItem basis, TodoItem next) {
+    var dayAfter = DateTime(basis.dueDate.year, basis.dueDate.month, basis.dueDate.day+1);
+    if (next.reminders.isEmpty) {
+      return dayAfter;
+    }
+    next.reminders.sort((a,b) => a.at.compareTo(b.at));
+    var firstReminder = next.reminders.first.at;
+    if (dayAfter.isBefore(firstReminder)) {
+      return dayAfter;
+    } else {
+      return DateTime(firstReminder.year, firstReminder.month, firstReminder.day);
+    }
+  }
+
+  Future<void> _setRemindersForPendingItem(TodoItem basis, TodoItem next) async {
+    if (basis.repeatedStatus != RepeatedStatus.active || basis.repeated.autoAdvance != true) {
+      return;
+    }
+    for (int i=0; i<basis.reminders.length; i++) {
+      var oldReminder = basis.reminders[i];
+      var newReminder = next.reminders[i];
+      await _notificationFFI.setReminder(next, newReminder.withId(reminderId(oldReminder.id)));
+    }
+  }
+
+  Future<void> _cancelRemindersForPendingItem(TodoItem basis) async {
+    if (basis.repeatedStatus != RepeatedStatus.active || basis.repeated.autoAdvance != true) {
+      return;
+    }
+    for (final r in basis.reminders) {
+      await _notificationFFI.cancelReminder(reminderId(r.id));
+    }
+  }
+
+  Future<void> _replaceRemindersForPendingItem(TodoItem basis, TodoItem next) async {
+    if (basis.repeatedStatus != RepeatedStatus.active || basis.repeated.autoAdvance != true) {
+      return;
+    }
+    for (int i=0; i<basis.reminders.length; i++) {
+      var oldReminder = basis.reminders[i];
+      var newReminder = next.reminders[i];
+      if (newReminder.at.isBefore(DateTime.now())) {
+        await _notificationFFI.updateReminder(next, newReminder.withId(reminderId(oldReminder.id)));
+      } else {
+        await _notificationFFI.cancelReminder(reminderId(oldReminder.id));
+        await _notificationFFI.setReminder(next, newReminder);
+      }
+    }
+  }
+}
+
+int alarmId(int itemId) {
+  return itemId | PENDING_ITEM_CREATE_PREFIX;
+}
+
+int reminderId(int reminderId) {
+  return reminderId | PENDING_ITEM_NOTIFICATION_PREFIX;
 }
 
 void _backgroundCallback() async {

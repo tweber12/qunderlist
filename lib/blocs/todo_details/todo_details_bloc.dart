@@ -135,6 +135,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
     updateReminders(_fullItem);
+    _notificationHandler.setPendingItem(_fullItem);
     _writeMutex.release();
   }
 
@@ -152,13 +153,15 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _fullItem = _fullItem.toggleCompleted();
     yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     if (_fullItem.completed) {
-      _notificationHandler.cancelRemindersForItem(_fullItem, _repository);
+      _notificationHandler.cancelRemindersForItem(_fullItem);
       if (_fullItem.repeatedStatus == RepeatedStatus.active) {
+        _notificationHandler.cancelPendingItem(_fullItem);
         var next = await _repository.addTodoItem(nextItem(_fullItem));
-        _notificationHandler.setRemindersForItem(next, _repository);
+        _notificationHandler.setRemindersForItem(next);
       }
     } else {
-      _notificationHandler.setRemindersForItem(_fullItem, _repository);
+      _notificationHandler.setRemindersForItem(_fullItem);
+      _notificationHandler.setPendingItem(_fullItem);
     }
     if (_fullItem.completed && !(_fullItem.repeated?.keepHistory ?? true)) {
       await _repository.deleteTodoItem(_fullItem.id);
@@ -176,15 +179,18 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _notifyList();
     await _repository.updateTodoItem(_fullItem);
     updateReminders(_fullItem);
+    _notificationHandler.setPendingItem(_fullItem);
     _writeMutex.release();
   }
 
   Stream<TodoDetailsState> _mapUpdateDueDateEventToState(UpdateDueDateEvent event) async* {
     await _writeMutex.acquire();
     if (event.newDueDate == null) {
+      _notificationHandler.cancelPendingItem(_fullItem);
       _fullItem = _fullItem.copyWith(dueDate: Nullable(event.newDueDate), repeated: Nullable(null));
     } else {
       _fullItem = _fullItem.copyWith(dueDate: Nullable(event.newDueDate), repeated: Nullable(_fullItem.repeated?.copyWith(active: true)));
+      _notificationHandler.setPendingItem(_fullItem);
     }
     yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
@@ -209,6 +215,11 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
       await _repository.updateTodoItem(_fullItem);
     }
     await _repository.updateRepeated(_fullItem.id, _fullItem.repeated);
+    if (event.repeated != null && event.repeated.autoAdvance) {
+      _notificationHandler.setPendingItem(_fullItem);
+    } else {
+      _notificationHandler.cancelPendingItem(_fullItem);
+    }
     _writeMutex.release();
   }
 
@@ -221,6 +232,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     _notificationHandler.setReminder(_fullItem, event.reminder.withId(id));
+    _notificationHandler.setPendingItem(_fullItem);
     _writeMutex.release();
   }
 
@@ -232,6 +244,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _notifyList();
     await _repository.updateReminder(event.reminder.id, event.reminder.at);
     _notificationHandler.updateReminder(_fullItem, event.reminder);
+    _notificationHandler.setPendingItem(_fullItem);
     _writeMutex.release();
   }
 
@@ -243,6 +256,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _notifyList();
     await _repository.deleteReminder(event.reminder.id);
     _notificationHandler.cancelReminder(event.reminder.id);
+    _notificationHandler.setPendingItem(_fullItem);
     _writeMutex.release();
   }
 
@@ -285,7 +299,8 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapDeleteEventToState(DeleteEvent event) async* {
     _notifyList();
     await _repository.deleteTodoItem(_fullItem.id);
-    _notificationHandler.cancelRemindersForItem(_fullItem, _repository);
+    _notificationHandler.cancelRemindersForItem(_fullItem);
+    _notificationHandler.cancelPendingItem(_fullItem);
   }
 
   Stream<TodoDetailsState> _externalUpdate(ExternalUpdateEvent event) async* {

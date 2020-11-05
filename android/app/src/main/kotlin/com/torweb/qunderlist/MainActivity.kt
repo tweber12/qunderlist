@@ -45,6 +45,8 @@ const val ACTION_OPEN = "com.torweb.qunderlist.open"
 const val ACTION_SNOOZE = "com.torweb.qunderlist.snooze"
 const val ACTION_COMPLETE = "com.torweb.qunderlist.complete"
 const val ACTION_DISMISSED = "com.torweb.qunderlist.dismissed"
+const val ACTION_SHOW_NOTIFICATION = "com.torweb.qunderlist.show_notification"
+const val ACTION_CREATE_NEXT = "com.torweb.qunderlist.create_next"
 
 class MainActivity: FlutterActivity() {
     init {
@@ -64,18 +66,26 @@ class MainActivity: FlutterActivity() {
 
 class AlarmService: BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val reminderId = intent.getLongExtra(REMINDER_ID_EXTRA, 0)
-        val itemId = intent.getLongExtra(ITEM_ID_EXTRA, 0)
-        if (inCompletedItems(context, itemId)) {
-            // The item was already completed using the notifications action button, but hasn't
-            // properly been removed yet since the JobIntentService for that hasn't been
-            // scheduled yet
-            return
+        when (intent.action) {
+            ACTION_SHOW_NOTIFICATION -> {
+                val reminderId = intent.getLongExtra(REMINDER_ID_EXTRA, 0)
+                val itemId = intent.getLongExtra(ITEM_ID_EXTRA, 0)
+                if (inCompletedItems(context, itemId)) {
+                    // The item was already completed using the notifications action button, but hasn't
+                    // properly been removed yet since the JobIntentService for that hasn't been
+                    // scheduled yet
+                    return
+                }
+                val itemTitle = intent.getStringExtra(ITEM_TITLE_EXTRA)
+                val itemNote = intent.getStringExtra(ITEM_NOTE_EXTRA)
+                showNotification(context, reminderId, itemId, itemTitle, itemNote)
+                registerNotification(context, reminderId)
+            }
+            ACTION_CREATE_NEXT -> {
+                val itemId = intent.getLongExtra(ITEM_ID_EXTRA, 0)
+                enqueueCreateNextJob(context, itemId)
+            }
         }
-        val itemTitle = intent.getStringExtra(ITEM_TITLE_EXTRA)
-        val itemNote = intent.getStringExtra(ITEM_NOTE_EXTRA)
-        showNotification(context, reminderId, itemId, itemTitle, itemNote)
-        registerNotification(context, reminderId)
     }
 }
 
@@ -111,7 +121,7 @@ class NotificationReceiver: BroadcastReceiver() {
     private fun snoozeReminder(context: Context, reminderId: Long) {
         val time = Calendar.getInstance()
         time.add(Calendar.MINUTE, 20)
-        val intent = Intent(context, AlarmService::class.java).putExtra(REMINDER_ID_EXTRA, reminderId)
+        val intent = Intent(context, AlarmService::class.java).setAction(ACTION_SHOW_NOTIFICATION).putExtra(REMINDER_ID_EXTRA, reminderId)
         val pendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         AlarmManagerCompat.setExactAndAllowWhileIdle(
@@ -137,13 +147,7 @@ class RebootReceiver: BroadcastReceiver() {
     }
 }
 
-fun showNotification(context: Context, reminderId: Long, itemId: Long, itemTitle: String, itemNote: String) {
-    val showItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_OPEN; putExtra(REMINDER_ID_EXTRA, reminderId); putExtra(ITEM_ID_EXTRA, itemId) }
-    val showItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), showItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
-    val completeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_COMPLETE; putExtra(REMINDER_ID_EXTRA, reminderId); putExtra(ITEM_ID_EXTRA, itemId) }
-    val completeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), completeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
-    val snoozeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_SNOOZE; putExtra(REMINDER_ID_EXTRA, reminderId) }
-    val snoozeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), snoozeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+fun showNotification(context: Context, reminderId: Long, itemId: Long?, itemTitle: String, itemNote: String) {
     val dismissNotificationIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_DISMISSED; putExtra(REMINDER_ID_EXTRA, reminderId) }
     val dismissNotificationPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), dismissNotificationIntent, PendingIntent.FLAG_UPDATE_CURRENT)
 
@@ -151,12 +155,20 @@ fun showNotification(context: Context, reminderId: Long, itemId: Long, itemTitle
     val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(itemTitle)
-            .setContentIntent(showItemPendingIntent)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .addAction(0, "Complete", completeItemPendingIntent)
-            .addAction(0, "Snooze", snoozeItemPendingIntent)
             .setDeleteIntent(dismissNotificationPendingIntent)
             .setOnlyAlertOnce(true)
+    if (itemId != null) {
+        val showItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_OPEN; putExtra(REMINDER_ID_EXTRA, reminderId); putExtra(ITEM_ID_EXTRA, itemId) }
+        val showItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), showItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val completeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_COMPLETE; putExtra(REMINDER_ID_EXTRA, reminderId); putExtra(ITEM_ID_EXTRA, itemId) }
+        val completeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), completeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val snoozeItemIntent = Intent(context, NotificationReceiver::class.java).apply { action = ACTION_SNOOZE; putExtra(REMINDER_ID_EXTRA, reminderId) }
+        val snoozeItemPendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), snoozeItemIntent, PendingIntent.FLAG_UPDATE_CURRENT)
+        builder.setContentIntent(showItemPendingIntent)
+                .addAction(0, "Complete", completeItemPendingIntent)
+                .addAction(0, "Snooze", snoozeItemPendingIntent)
+    }
     if (!itemNote.isBlank()) {
         builder.setContentText(itemNote)
     }
@@ -167,6 +179,7 @@ fun showNotification(context: Context, reminderId: Long, itemId: Long, itemTitle
 
 fun setAlarm(context: Context, reminderId: Long, reminderTime: Long, itemId: Long, itemTitle: String, itemNote: String ) {
     val intent = Intent(context, AlarmService::class.java)
+            .setAction(ACTION_SHOW_NOTIFICATION)
             .putExtra(REMINDER_ID_EXTRA, reminderId)
             .putExtra(ITEM_ID_EXTRA, itemId)
             .putExtra(ITEM_TITLE_EXTRA, itemTitle)
