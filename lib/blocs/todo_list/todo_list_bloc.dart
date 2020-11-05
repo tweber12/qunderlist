@@ -26,6 +26,7 @@ import 'package:qunderlist/repository/repository.dart';
 
 class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoListStates> {
   R _repository;
+  NotificationHandler _notificationHandler;
   TodoListsBloc _listsBloc;
   TodoList _list;
   int _listId;
@@ -33,8 +34,9 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
   // This is done to avoid problems with the db and the cache getting out of sync
   final Mutex _writeMutex = Mutex();
   StreamSubscription<ExternalUpdate> _updateStream;
-  TodoListBloc(R repository, int listId, {TodoList list, TodoStatusFilter filter: TodoStatusFilter.active, TodoListsBloc listsBloc}):
+  TodoListBloc(R repository, NotificationHandler notificationHandler, int listId, {TodoList list, TodoStatusFilter filter: TodoStatusFilter.active, TodoListsBloc listsBloc}):
         _repository=repository,
+        _notificationHandler=notificationHandler,
         _listsBloc=listsBloc,
         _listId = listId,
         _list=list,
@@ -97,7 +99,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     _writeMutex.release();
   }
   Stream<TodoListStates> _mapDeleteListEventToState(DeleteListEvent event) async* {
-    await cancelRemindersForList(_list, _repository);
+    await _notificationHandler.cancelRemindersForList(_list, _repository);
     await _repository.deleteTodoList(_list.id);
     yield TodoListDeleted();
     _notifyListsBloc();
@@ -119,7 +121,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     var item = await _repository.addTodoItem(event.item, onList: _list);
     cache = cache.addElementAtEnd(item.shorten());
     yield TodoListLoaded(_list, cache);
-    setRemindersForItem(item, _repository);
+    _notificationHandler.setRemindersForItem(item, _repository);
     _notifyListsBloc();
     _writeMutex.release();
   }
@@ -135,7 +137,7 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
       // No other lists contain this item, so delete it and all it's reminders
       var full = await _repository.getTodoItem(event.item.id);
       await _repository.deleteTodoItem(event.item.id);
-      cancelRemindersForItem(full, _repository);
+      _notificationHandler.cancelRemindersForItem(full, _repository);
     }
     _notifyListsBloc();
     _writeMutex.release();
@@ -149,10 +151,10 @@ class TodoListBloc<R extends TodoRepository> extends Bloc<TodoListEvent, TodoLis
     yield TodoListLoaded(_list, cache);
     if (newItem.completed) {
       // The event has been completed, so remove all notifications
-      cancelRemindersForItem(event.item, _repository);
+      _notificationHandler.cancelRemindersForItem(event.item, _repository);
     } else {
       // The event has been activated again, so activate all notifications as well
-      setRemindersForItem(event.item, _repository);
+      _notificationHandler.setRemindersForItem(event.item, _repository);
     }
     if (newItem.completed && newItem.repeatedStatus == RepeatedStatus.active) {
       // The item is repeated

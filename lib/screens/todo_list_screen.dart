@@ -17,6 +17,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/base.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
+import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/theme.dart';

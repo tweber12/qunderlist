@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import 'dart:ui';
-
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:qunderlist/blocs/base.dart';
-import 'package:qunderlist/notification_handler.dart';
-import 'package:qunderlist/repository/repository.dart';
-import 'package:qunderlist/repository/todos_repository_sqflite.dart';
+import 'package:qunderlist/repository/models.dart';
 
 const String NOTIFICATION_FFI_CHANNEL_NAME = "com.torweb.qunderlist.notification_ffi_channel";
 const String NOTIFICATION_FFI_BG_CHANNEL_NAME = "com.torweb.qunderlist.notification_ffi_background_channel";
@@ -42,41 +37,62 @@ const String NOTIFICATION_FFI_REMINDER_ID = "id";
 const String NOTIFICATION_FFI_REMINDER_TIME = "at";
 
 class NotificationFFI {
-  static const MethodChannel METHOD_CHANNEL = const MethodChannel(NOTIFICATION_FFI_CHANNEL_NAME);
-  static const MethodChannel METHOD_CHANNEL_BG = const MethodChannel(NOTIFICATION_FFI_BG_CHANNEL_NAME);
+  static Map<String,NotificationFFI> _singletons = Map();
 
-  static NotificationFFI _notificationFFI;
+  final String channelName;
+  final MethodChannel channel;
 
-  factory NotificationFFI(TodoRepository repository, BaseBloc bloc) {
-    if (_notificationFFI == null) {
-      _notificationFFI = NotificationFFI._internal(repository, bloc);
+  final Function(int) notificationCallback;
+  final Function(int) completeItemCallback;
+  final Function() restoreAlarmsCallback;
+
+  factory NotificationFFI({
+      @required String channelName,
+      Function(int) notificationCallback,
+      Function(int) completeItemCallback,
+      Function() restoreAlarmsCallback
+    }) {
+    var ffi = _singletons[channelName];
+    if (ffi != null) {
+      return ffi;
+    } else {
+      ffi = NotificationFFI._internal(
+          channelName: channelName,
+          notificationCallback: notificationCallback,
+          completeItemCallback: completeItemCallback,
+          restoreAlarmsCallback: restoreAlarmsCallback
+      );
+      _singletons[channelName] = ffi;
+      return ffi;
     }
-    return _notificationFFI;
   }
 
-  NotificationFFI._internal(this.repository, this.bloc): _init = false {
-    _setMethodCallHandler();
+  NotificationFFI._internal({
+    @required String channelName,
+    this.notificationCallback,
+    this.completeItemCallback,
+    this.restoreAlarmsCallback
+  }):
+        this.channelName = channelName,
+        channel = MethodChannel(channelName)
+  {
+    channel.setMethodCallHandler(methodCallHandler);
   }
 
-  final TodoRepository repository;
-  final BaseBloc bloc;
-  bool _init;
+  void setMockMethodCallHandler(Function(MethodCall call) handler) {
+    channel.setMockMethodCallHandler(handler);
+  }
 
-  Future<void> init() async {
-    if (_init) {
-      return;
-    }
-    _init = true;
-    var handle = PluginUtilities.getCallbackHandle(_backgroundCallback).toRawHandle();
-    await _invoke(NOTIFICATION_FFI_INIT, handle);
+  Future<void> init(int callbackHandle) async {
+    await channel.invokeMethod(NOTIFICATION_FFI_INIT, callbackHandle);
     return ready();
   }
 
   Future<void> ready() {
-    return _invoke(NOTIFICATION_FFI_READY);
+    return channel.invokeMethod(NOTIFICATION_FFI_READY);
   }
 
-  static Future<void> setReminder(TodoItemBase item, Reminder reminder) {
+  Future<void> setReminder(TodoItemBase item, Reminder reminder) {
     var args = {
       NOTIFICATION_FFI_REMINDER_ID: reminder.id,
       NOTIFICATION_FFI_REMINDER_TIME: reminder.at.millisecondsSinceEpoch,
@@ -84,10 +100,10 @@ class NotificationFFI {
       NOTIFICATION_FFI_ITEM_TITLE: item.todo,
       NOTIFICATION_FFI_ITEM_NOTE: item.note
     };
-    return _invoke(NOTIFICATION_FFI_SET_REMINDER, args);
+    return channel.invokeMethod(NOTIFICATION_FFI_SET_REMINDER, args);
   }
 
-  static Future<void> updateReminder(TodoItemBase item, Reminder reminder) {
+  Future<void> updateReminder(TodoItemBase item, Reminder reminder) {
     var args = {
       NOTIFICATION_FFI_REMINDER_ID: reminder.id,
       NOTIFICATION_FFI_REMINDER_TIME: reminder.at.millisecondsSinceEpoch,
@@ -95,79 +111,39 @@ class NotificationFFI {
       NOTIFICATION_FFI_ITEM_TITLE: item.todo,
       NOTIFICATION_FFI_ITEM_NOTE: item.note
     };
-    return _invoke(NOTIFICATION_FFI_UPDATE_REMINDER, args);
+    return channel.invokeMethod(NOTIFICATION_FFI_UPDATE_REMINDER, args);
   }
 
-  static Future<void> cancelReminder(int reminderId) {
-    return _invoke(NOTIFICATION_FFI_DELETE_REMINDER, reminderId);
+  Future<void> cancelReminder(int reminderId) {
+    return channel.invokeMethod(NOTIFICATION_FFI_DELETE_REMINDER, reminderId);
   }
 
-  static Future<dynamic> _invoke(String method, [dynamic arguments]) async {
-    var result;
-    try {
-      result = await METHOD_CHANNEL.invokeMethod(method, arguments);
-    } catch (err) {
-      try {
-        result = await METHOD_CHANNEL_BG.invokeMethod(method, arguments);
-      } catch (err) {
-        result = null;
-      }
-    }
-    return result;
-  }
-
-  void _setMethodCallHandler() {
-    METHOD_CHANNEL.setMethodCallHandler((call) async {
-      switch (call.method) {
-        case NOTIFICATION_FFI_NOTIFICATION_CALLBACK:
-          var id = call.arguments as int;
-          _notificationCallback(id);
-          break;
-        case NOTIFICATION_FFI_COMPLETE_ITEM:
-          _completeItem(repository, call.arguments as int);
-          break;
-        case NOTIFICATION_FFI_RESTORE_ALARMS:
-          _restoreAlarms(repository);
-          break;
-      }
-    });
-  }
-
-  Future<void> _notificationCallback(int itemId) async {
-    var list = (await repository.getListsOfItem(itemId)).first;
-    bloc.add(BaseShowItemEvent(itemId, listId: list.id, list: list));
-  }
-}
-
-void _backgroundCallback() {
-  WidgetsFlutterBinding.ensureInitialized();
-  const MethodChannel BACKGROUND_METHOD_CHANNEL = const MethodChannel(NOTIFICATION_FFI_BG_CHANNEL_NAME);
-  BACKGROUND_METHOD_CHANNEL.setMethodCallHandler((call) async {
+  Future<void> methodCallHandler(MethodCall call) async {
     switch (call.method) {
+      case NOTIFICATION_FFI_NOTIFICATION_CALLBACK:
+        var id = call.arguments as int;
+        notificationCallback(id);
+        break;
       case NOTIFICATION_FFI_COMPLETE_ITEM:
-        _completeItem(await TodoRepositorySqflite.getInstance(), call.arguments as int);
+        completeItemCallback(call.arguments as int);
         break;
       case NOTIFICATION_FFI_RESTORE_ALARMS:
-        _restoreAlarms(await TodoRepositorySqflite.getInstance());
+        restoreAlarmsCallback();
         break;
     }
-  });
-  BACKGROUND_METHOD_CHANNEL.invokeMethod(NOTIFICATION_FFI_READY);
-}
-
-Future<void> _completeItem<R extends TodoRepository>(R repository, int itemId) async {
-  var item = await repository.getTodoItem(itemId);
-  await cancelRemindersForItem(item, repository);
-  var newItem = item.toggleCompleted();
-  await repository.updateTodoItem(newItem);
-  repository.triggerUpdate();
-}
-
-Future<void> _restoreAlarms<R extends TodoRepository>(R repository) async {
-  var reminders = await repository.getActiveReminders();
-  for (final r in reminders) {
-    var itemId = await repository.getItemOfReminder(r.id);
-    var item = await repository.getTodoItem(itemId);
-    await NotificationFFI.setReminder(item, r);
   }
+}
+
+NotificationFFI notificationFFIInitialize({
+  @required String channelName,
+  Function(int) notificationCallback,
+  Function(int) completeItemCallback,
+  Function() restoreAlarmsCallback
+}) {
+  return NotificationFFI(
+      channelName: channelName,
+      notificationCallback: notificationCallback,
+      completeItemCallback: completeItemCallback,
+      restoreAlarmsCallback: restoreAlarmsCallback
+  );
 }

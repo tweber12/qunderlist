@@ -24,6 +24,7 @@ import 'package:qunderlist/repository/repository.dart';
 
 class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, TodoListsStates> {
   R _repository;
+  NotificationHandler _notificationHandler;
   ListCache<TodoList> cache;
   ElementCache<int> numberOfItems;
   ElementCache<int> numberOfOverdueItems;
@@ -31,8 +32,9 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
   // This is done to avoid problems with the db and the cache getting out of sync
   Mutex _writeMutex = Mutex();
   StreamSubscription<ExternalUpdate> _updateStream;
-  TodoListsBloc(TodoRepository repository):
+  TodoListsBloc(TodoRepository repository, NotificationHandler notificationHandler):
         _repository=repository,
+        _notificationHandler=notificationHandler,
         numberOfItems = ElementCache((int index) => repository.getNumberOfTodoItems(index, TodoStatusFilter.active)),
         numberOfOverdueItems = ElementCache((int index) => repository.getNumberOfOverdueItems(index)),
         super(TodoListsLoading())
@@ -79,7 +81,7 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
     await _writeMutex.acquire();
     cache = cache.removeElement(event.index, element: event.list);
     yield TodoListsLoaded(cache, numberOfItems, numberOfOverdueItems);
-    await cancelRemindersForList(event.list, _repository);
+    await _notificationHandler.cancelRemindersForList(event.list, _repository);
     await _repository.deleteTodoList(event.list.id);
     _writeMutex.release();
   }

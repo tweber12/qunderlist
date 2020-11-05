@@ -55,14 +55,16 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   TodoItem _fullItem;
   final TodoListBloc _listBloc;
   final R _repository;
+  final NotificationHandler _notificationHandler;
   RateLimit notifier;
   // Ensure that only one process modifies the cache and db at the same time
   // This is done to avoid problems with the db and the cache getting out of sync
   final Mutex _writeMutex = Mutex();
   StreamSubscription _updateStream;
 
-  TodoDetailsBloc(R repository, int itemId, {TodoItemBase item, TodoListBloc listBloc}):
+  TodoDetailsBloc(R repository, NotificationHandler notificationHandler, int itemId, {TodoItemBase item, TodoListBloc listBloc}):
         _repository=repository,
+        _notificationHandler=notificationHandler,
         _listBloc=listBloc,
         _baseItem=item,
         _itemId = itemId,
@@ -150,13 +152,13 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _fullItem = _fullItem.toggleCompleted();
     yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     if (_fullItem.completed) {
-      cancelRemindersForItem(_fullItem, _repository);
+      _notificationHandler.cancelRemindersForItem(_fullItem, _repository);
       if (_fullItem.repeatedStatus == RepeatedStatus.active) {
         var next = await _repository.addTodoItem(nextItem(_fullItem));
-        setRemindersForItem(next, _repository);
+        _notificationHandler.setRemindersForItem(next, _repository);
       }
     } else {
-      setRemindersForItem(_fullItem, _repository);
+      _notificationHandler.setRemindersForItem(_fullItem, _repository);
     }
     if (_fullItem.completed && !(_fullItem.repeated?.keepHistory ?? true)) {
       await _repository.deleteTodoItem(_fullItem.id);
@@ -218,7 +220,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     _fullItem = _fullItem.copyWith(reminders: newReminders);
     yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
-    NotificationFFI.setReminder(_fullItem, event.reminder.withId(id));
+    _notificationHandler.setReminder(_fullItem, event.reminder.withId(id));
     _writeMutex.release();
   }
 
@@ -229,7 +231,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.updateReminder(event.reminder.id, event.reminder.at);
-    NotificationFFI.updateReminder(_fullItem, event.reminder);
+    _notificationHandler.updateReminder(_fullItem, event.reminder);
     _writeMutex.release();
   }
 
@@ -240,7 +242,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.deleteReminder(event.reminder.id);
-    NotificationFFI.cancelReminder(event.reminder.id);
+    _notificationHandler.cancelReminder(event.reminder.id);
     _writeMutex.release();
   }
 
@@ -283,7 +285,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
   Stream<TodoDetailsState> _mapDeleteEventToState(DeleteEvent event) async* {
     _notifyList();
     await _repository.deleteTodoItem(_fullItem.id);
-    cancelRemindersForItem(_fullItem, _repository);
+    _notificationHandler.cancelRemindersForItem(_fullItem, _repository);
   }
 
   Stream<TodoDetailsState> _externalUpdate(ExternalUpdateEvent event) async* {
@@ -303,7 +305,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
 
   Future<void> updateReminders(TodoItem item) async {
     for (final r in item.reminders) {
-      await NotificationFFI.updateReminder(item, r);
+      await _notificationHandler.updateReminder(item, r);
     }
   }
 

@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:qunderlist/blocs/todo_details.dart';
+import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/theme.dart';
 import 'package:qunderlist/widgets/change_text_dialog.dart';

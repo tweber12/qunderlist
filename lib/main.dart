@@ -20,6 +20,7 @@ import 'package:qunderlist/blocs/todo_details.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
 import 'package:qunderlist/notification_ffi.dart';
+import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 import 'package:qunderlist/screens/todo_item_screen.dart';
@@ -29,23 +30,34 @@ import 'package:qunderlist/screens/todo_lists_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   var repository = await TodoRepositorySqflite.getInstance();
-  var base = BaseBloc(repository);
-  var notificationHandler = NotificationFFI(repository, base);
+  var notificationHandler = NotificationHandler.foreground(repository);
+  var base = BaseBloc(repository, notificationHandler);
   runApp(
       MultiRepositoryProvider(
           providers: [
             RepositoryProvider<TodoRepository>.value(value: repository),
-            RepositoryProvider<NotificationFFI>.value(value: notificationHandler),
+            RepositoryProvider<NotificationHandler>.value(value: notificationHandler),
           ],
           child: BlocProvider.value(
             value: base,
-            child: MyApp(),
+            child: Qunderlist(),
           )
       )
   );
+  base.close();
 }
 
-class MyApp extends StatelessWidget {
+class Qunderlist extends StatefulWidget {
+  @override
+  _QunderlistState createState() => _QunderlistState();
+}
+
+class _QunderlistState extends State<Qunderlist> {
+  @override
+  void initState() {
+    super.initState();
+    RepositoryProvider.of<NotificationHandler>(context).init(BlocProvider.of<BaseBloc>(context));
+  }
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
@@ -55,8 +67,8 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       routerDelegate: TodoRouterDelegate(
-        RepositoryProvider.of<TodoRepository>(context),
-        BlocProvider.of<BaseBloc>(context)
+          RepositoryProvider.of<TodoRepository>(context),
+          BlocProvider.of<BaseBloc>(context)
       ),
       routeInformationParser: TodoRouteInformationParser(),
     );

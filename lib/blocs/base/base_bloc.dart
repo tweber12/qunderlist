@@ -4,18 +4,20 @@ import 'package:qunderlist/blocs/base/base_state.dart';
 import 'package:qunderlist/blocs/todo_details.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
 import 'package:qunderlist/blocs/todo_lists.dart';
+import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 
 class BaseBloc extends Bloc<BaseEvent, BaseState> {
-  BaseBloc(TodoRepository repository): this._internal(repository, null, null, TodoListsBloc(repository), null, null);
+  BaseBloc(TodoRepository repository, NotificationHandler notificationHandler): this._internal(repository, notificationHandler, null, null, TodoListsBloc(repository, notificationHandler), null, null);
 
-  BaseBloc._internal(this.repository, this._listId, this._itemId, this._listsBloc, this._listBloc, this._itemBloc):
+  BaseBloc._internal(this.repository, this.notificationHandler, this._listId, this._itemId, this._listsBloc, this._listBloc, this._itemBloc):
         super(BaseState(_listId, _itemId, _listsBloc, _listBloc, _itemBloc))
   {
     _listsBloc.add(LoadTodoListsEvent());
   }
 
   final TodoRepository repository;
+  final NotificationHandler notificationHandler;
   int _listId;
   int _itemId;
   TodoListsBloc _listsBloc;
@@ -76,7 +78,7 @@ class BaseBloc extends Bloc<BaseEvent, BaseState> {
 
   void _navigateToListInternal(int listId, TodoList list) {
     if (_listId == null && _itemId == null) {
-      _listBloc = TodoListBloc(repository, listId, list: list, listsBloc: _listsBloc);
+      _listBloc = TodoListBloc(repository, notificationHandler, listId, list: list, listsBloc: _listsBloc);
       _listBloc.add(GetDataEvent());
       _listId = listId;
     } else if (_itemId == null) {
@@ -94,7 +96,7 @@ class BaseBloc extends Bloc<BaseEvent, BaseState> {
       return;
     } else {
       _listBloc.close();
-      _listBloc = TodoListBloc(repository, listId, list: list, listsBloc: _listsBloc);
+      _listBloc = TodoListBloc(repository, notificationHandler, listId, list: list, listsBloc: _listsBloc);
       _listBloc.add(GetDataEvent());
       _listId = listId;
     }
@@ -105,7 +107,7 @@ class BaseBloc extends Bloc<BaseEvent, BaseState> {
       return;
     }
     _navigateToListInternal(listId, list);
-    _itemBloc = TodoDetailsBloc(repository, itemId, listBloc: _listBloc, item: item);
+    _itemBloc = TodoDetailsBloc(repository, notificationHandler, itemId, listBloc: _listBloc, item: item);
     _itemBloc.add(LoadItemEvent());
     _itemId = itemId;
     yield BaseState(_listId, _itemId, _listsBloc, _listBloc, _itemBloc);
