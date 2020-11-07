@@ -17,7 +17,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qunderlist/blocs/base.dart';
 import 'package:qunderlist/blocs/cache.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
-import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 import 'package:qunderlist/screens/cached_list.dart';
 import 'package:qunderlist/theme.dart';
@@ -275,6 +274,7 @@ class TodoListItemCard extends StatelessWidget {
                 if (numReminders > 0) Icon(Icons.alarm, size: SUB_INFO_SIZE, color: Colors.black54,),
                 if (numReminders > 0) Text("($numReminders)", style: TextStyle(fontSize: SUB_INFO_SIZE, color: Colors.black54)),
                 if (numReminders > 0) Container(width: 5),
+                if (item.repeatedStatus == RepeatedStatus.active) Icon(Icons.repeat, size: SUB_INFO_SIZE, color: Colors.black54),
               ],
             ),
           ],
