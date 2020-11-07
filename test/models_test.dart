@@ -213,17 +213,47 @@ void main() {
     });
 
     test("toggleCompleted active", () {
-      var item = TodoItem(title, createdOn, priority: priority, note: note, dueDate: dueDate, reminders: reminders, id: id, repeated: repeat);
+      var item = TodoItem(title, createdOn, priority: priority, note: note, dueDate: dueDate, reminders: reminders, id: id);
       var newItem = item.toggleCompleted();
       expect(newItem.completed, true);
       expect(newItem, item.copyWith(completedOn: Nullable(newItem.completedOn)));
     });
 
     test("toggleCompleted completed", () {
+      var item = TodoItem(title, createdOn, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate, reminders: reminders, id: id);
+      var newItem = item.toggleCompleted();
+      expect(newItem.completed, false);
+      expect(newItem, item.copyWith(completedOn: Nullable(null)));
+    });
+
+    test("toggleCompleted active repeat active", () {
+      var item = TodoItem(title, createdOn, priority: priority, note: note, dueDate: dueDate, reminders: reminders, id: id, repeated: repeat);
+      var newItem = item.toggleCompleted();
+      expect(newItem.completed, true);
+      expect(newItem, item.copyWith(completedOn: Nullable(newItem.completedOn), repeated: Nullable(repeat.copyWith(active: false))));
+    });
+
+    test("toggleCompleted completed repeat active", () {
       var item = TodoItem(title, createdOn, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate, reminders: reminders, id: id, repeated: repeat);
       var newItem = item.toggleCompleted();
       expect(newItem.completed, false);
       expect(newItem, item.copyWith(completedOn: Nullable(null)));
+    });
+
+    test("toggleCompleted active repeat inactive", () {
+      var repeat = Repeated(false, false, false, true, RepeatedStepDaily(2));
+      var item = TodoItem(title, createdOn, priority: priority, note: note, dueDate: dueDate, reminders: reminders, id: id, repeated: repeat);
+      var newItem = item.toggleCompleted();
+      expect(newItem.completed, true);
+      expect(newItem, item.copyWith(completedOn: Nullable(newItem.completedOn)));
+    });
+
+    test("toggleCompleted completed repeat inactive", () {
+      var repeat = Repeated(false, false, false, true, RepeatedStepDaily(2));
+      var item = TodoItem(title, createdOn, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate, reminders: reminders, id: id, repeated: repeat);
+      var newItem = item.toggleCompleted();
+      expect(newItem.completed, false);
+      expect(newItem, item.copyWith(completedOn: Nullable(null), repeated: Nullable(repeat.copyWith(active: true))));
     });
   });
 
@@ -369,17 +399,45 @@ void main() {
     });
 
     test("toggleCompleted active", () {
-      var item = TodoItemShort(title, createdOn, priority: priority, note: note, dueDate: dueDate, nActiveReminders: nActiveReminders, id: id, repeatedStatus: repeat);
+      var item = TodoItemShort(title, createdOn, priority: priority, note: note, dueDate: dueDate, nActiveReminders: nActiveReminders, id: id);
       var newItem = item.toggleCompleted();
       expect(newItem.completed, true);
       expect(newItem, item.copyWith(completedOn: Nullable(newItem.completedOn)));
     });
 
     test("toggleCompleted completed", () {
-      var item = TodoItemShort(title, createdOn, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate, nActiveReminders: nActiveReminders, id: id, repeatedStatus: repeat);
+      var item = TodoItemShort(title, createdOn, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate, nActiveReminders: nActiveReminders, id: id);
       var newItem = item.toggleCompleted();
       expect(newItem.completed, false);
       expect(newItem, item.copyWith(completedOn: Nullable(null)));
+    });
+
+    test("toggleCompleted active repeat active", () {
+      var item = TodoItemShort(title, createdOn, priority: priority, note: note, dueDate: dueDate, nActiveReminders: nActiveReminders, id: id, repeatedStatus: RepeatedStatus.active);
+      var newItem = item.toggleCompleted();
+      expect(newItem.completed, true);
+      expect(newItem, item.copyWith(completedOn: Nullable(newItem.completedOn), repeatedStatus: RepeatedStatus.inactive));
+    });
+
+    test("toggleCompleted completed repeat active", () {
+      var item = TodoItemShort(title, createdOn, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate, nActiveReminders: nActiveReminders, id: id, repeatedStatus: RepeatedStatus.active);
+      var newItem = item.toggleCompleted();
+      expect(newItem.completed, false);
+      expect(newItem, item.copyWith(completedOn: Nullable(null)));
+    });
+
+    test("toggleCompleted active repeat inactive", () {
+      var item = TodoItemShort(title, createdOn, priority: priority, note: note, dueDate: dueDate, nActiveReminders: nActiveReminders, id: id, repeatedStatus: RepeatedStatus.inactive);
+      var newItem = item.toggleCompleted();
+      expect(newItem.completed, true);
+      expect(newItem, item.copyWith(completedOn: Nullable(newItem.completedOn)));
+    });
+
+    test("toggleCompleted completed repeat inactive", () {
+      var item = TodoItemShort(title, createdOn, completedOn: completedOn, priority: priority, note: note, dueDate: dueDate, nActiveReminders: nActiveReminders, id: id, repeatedStatus: RepeatedStatus.inactive);
+      var newItem = item.toggleCompleted();
+      expect(newItem.completed, false);
+      expect(newItem, item.copyWith(completedOn: Nullable(null), repeatedStatus: RepeatedStatus.active));
     });
   });
 

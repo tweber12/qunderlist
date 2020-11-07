@@ -117,6 +117,18 @@ void main() {
 
   test('update item test', () async {
     var updateId = items[1].id;
+    var updateItem = TodoItem("updated", DateTime.now(), id: updateId, repeated: items[1].repeated);
+    await repository.updateTodoItem(updateItem);
+    for (final item in items.where((element) => element.id != updateId)) {
+      var resultItem = await repository.getTodoItem(item.id);
+      expect(resultItem, item);
+    }
+    // Reminders, repeat and lists are not affected by the update
+    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists));
+  });
+
+  test('update item test update repeat active -> null', () async {
+    var updateId = items[1].id;
     var updateItem = TodoItem("updated", DateTime.now(), id: updateId);
     await repository.updateTodoItem(updateItem);
     for (final item in items.where((element) => element.id != updateId)) {
@@ -124,10 +136,34 @@ void main() {
       expect(resultItem, item);
     }
     // Reminders, repeat and lists are not affected by the update
-    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists, repeated: Nullable(items[1].repeated)));
+    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists, repeated: Nullable(null)));
+  });
+
+  test('update item test update repeat active -> inactive', () async {
+    var updateId = items[1].id;
+    var updateItem = TodoItem("updated", DateTime.now(), id: updateId, repeated: items[1].repeated.copyWith(active: false));
+    await repository.updateTodoItem(updateItem);
+    for (final item in items.where((element) => element.id != updateId)) {
+      var resultItem = await repository.getTodoItem(item.id);
+      expect(resultItem, item);
+    }
+    // Reminders, repeat and lists are not affected by the update
+    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists));
   });
 
   test('update short item test', () async {
+    var updateId = items[1].id;
+    var updateItem = TodoItem("updated", DateTime.now(), id: updateId, repeated: items[1].repeated);
+    await repository.updateTodoItem(updateItem.shorten());
+    for (final item in items.where((element) => element.id != updateId)) {
+      var resultItem = await repository.getTodoItem(item.id);
+      expect(resultItem, item);
+    }
+    // Reminders, repeat and lists are not affected by the update
+    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists));
+  });
+
+  test('update short item test repeat active -> null', () async {
     var updateId = items[1].id;
     var updateItem = TodoItem("updated", DateTime.now(), id: updateId);
     await repository.updateTodoItem(updateItem.shorten());
@@ -136,6 +172,18 @@ void main() {
       expect(resultItem, item);
     }
     // Reminders, repeat and lists are not affected by the update
-    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists, repeated: Nullable(items[1].repeated)));
+    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists, repeated: Nullable(null)));
+  });
+
+  test('update short item test repeat active -> inactive', () async {
+    var updateId = items[1].id;
+    var updateItem = TodoItem("updated", DateTime.now(), id: updateId, repeated: items[1].repeated.copyWith(active: false));
+    await repository.updateTodoItem(updateItem.shorten());
+    for (final item in items.where((element) => element.id != updateId)) {
+      var resultItem = await repository.getTodoItem(item.id);
+      expect(resultItem, item);
+    }
+    // Reminders, repeat and lists are not affected by the update
+    expect(await repository.getTodoItem(updateId), updateItem.copyWith(reminders: items[1].reminders, onLists: items[1].onLists));
   });
 }

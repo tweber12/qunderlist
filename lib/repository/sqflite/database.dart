@@ -140,6 +140,12 @@ Map<String, dynamic> todoListToRepresentation(TodoList list, {int ordering}) {
 }
 
 Map<String, dynamic> todoItemToRepresentation(TodoItemBase item) {
+  var repeatActive;
+  switch (item.repeatedStatus) {
+    case RepeatedStatus.active: repeatActive = boolToRepresentation(true); break;
+    case RepeatedStatus.inactive: repeatActive = boolToRepresentation(false); break;
+    case RepeatedStatus.none: repeatActive = null; break;
+  };
   var map = {
     TODO_ITEM_NAME: item.todo,
     TODO_ITEM_PRIORITY: item.priority.index,
@@ -147,6 +153,7 @@ Map<String, dynamic> todoItemToRepresentation(TodoItemBase item) {
     TODO_ITEM_DUE_DATE: item.dueDate?.toIso8601String(),
     TODO_ITEM_CREATED_DATE: item.createdOn.toIso8601String(),
     TODO_ITEM_COMPLETED_DATE: item.completedOn?.toIso8601String(),
+    TODO_ITEM_REPEAT_ACTIVE: repeatActive,
   };
   return map;
 }

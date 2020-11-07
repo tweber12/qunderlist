@@ -86,9 +86,9 @@ class TodoItemShort extends TodoItemBase {
 
   TodoItemShort toggleCompleted() {
     if (completed) {
-      return copyWith(completedOn: Nullable(null));
+      return copyWith(completedOn: Nullable(null), repeatedStatus: repeatedStatus==RepeatedStatus.inactive ? RepeatedStatus.active : repeatedStatus);
     } else {
-      return copyWith(completedOn: Nullable(DateTime.now()));
+      return copyWith(completedOn: Nullable(DateTime.now()), repeatedStatus: repeatedStatus==RepeatedStatus.active ? RepeatedStatus.inactive : repeatedStatus);
     }
   }
 
@@ -146,9 +146,21 @@ class TodoItem extends TodoItemBase {
 
   TodoItem toggleCompleted() {
     if (completed) {
-      return copyWith(completedOn: Nullable(null));
+      var newRepeated;
+      if (repeatedStatus == RepeatedStatus.inactive) {
+        newRepeated = Nullable(repeated.copyWith(active: true));
+      } else {
+        newRepeated = Nullable(repeated);
+      }
+      return copyWith(completedOn: Nullable(null), repeated: newRepeated);
     } else {
-      return copyWith(completedOn: Nullable(DateTime.now()));
+      var newRepeated;
+      if (repeatedStatus == RepeatedStatus.active) {
+        newRepeated = Nullable(repeated.copyWith(active: false));
+      } else {
+        newRepeated = Nullable(repeated);
+      }
+      return copyWith(completedOn: Nullable(DateTime.now()), repeated: newRepeated);
     }
   }
 

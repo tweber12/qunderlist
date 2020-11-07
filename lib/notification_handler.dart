@@ -77,7 +77,7 @@ class NotificationHandler {
     await cancelRemindersForItem(item);
     var newItem = item.toggleCompleted();
     await repository.updateTodoItem(newItem);
-    repository.triggerUpdate();
+    await repository.triggerUpdate();
   }
 
   Future<void> _restoreAlarmsCallback() async {
@@ -100,6 +100,8 @@ class NotificationHandler {
       } else {
         await repository.deleteTodoItem(item.id);
       }
+    } else {
+      await repository.updateTodoItem(item.copyWith(repeated: Nullable(item.repeated.copyWith(active: false))));
     }
     var next = await repository.addTodoItem(nextItem(item));
     repository.triggerUpdate();
@@ -157,8 +159,8 @@ class NotificationHandler {
       }
       next = nextItem(basis);
     }
-    _setRemindersForPendingItem(basis, next);
-    _notificationFFI.setPendingItemAlarm(alarmId(basis.id), basis.id, _dateForPendingItemCreation(basis, next));
+    await _setRemindersForPendingItem(basis, next);
+    await _notificationFFI.setPendingItemAlarm(alarmId(basis.id), basis.id, _dateForPendingItemCreation(basis, next));
   }
 
   Future<void> cancelPendingItem(TodoItem basis, {TodoItem next}) async {
@@ -168,8 +170,8 @@ class NotificationHandler {
       }
       next = nextItem(basis);
     }
-    _cancelRemindersForPendingItem(basis);
-    _notificationFFI.cancelPendingItemAlarm(alarmId(basis.id));
+    await _cancelRemindersForPendingItem(basis);
+    await _notificationFFI.cancelPendingItemAlarm(alarmId(basis.id));
   }
 
   DateTime _dateForPendingItemCreation(TodoItem basis, TodoItem next) {

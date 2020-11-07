@@ -310,6 +310,7 @@ void main() {
         expect(added.dueDate, next.dueDate);
         expect(added.reminders[0].at, nextReminders[0].at);
         expect(added.reminders[1].at, nextReminders[1].at);
+        verify(repository.updateTodoItem(item.copyWith(repeated: Nullable(item.repeated.copyWith(active: false)))));
         verify(ffi.cancelReminder(reminderId(reminders[0].id)));
         verify(ffi.cancelReminder(reminderId(reminders[1].id)));
         verify(ffi.setReminder(next, nextReminders[0]));
@@ -343,6 +344,7 @@ void main() {
         var completed = verify(repository.updateTodoItem(captureAny)).captured.single;
         expect(completed.id, item.id);
         expect(completed.completedOn, isNotNull);
+        expect(completed.repeatedStatus, RepeatedStatus.inactive);
         var added = verify(repository.addTodoItem(captureAny)).captured.single;
         expect(added.todo, item.todo);
         expect(added.repeated, item.repeated);
