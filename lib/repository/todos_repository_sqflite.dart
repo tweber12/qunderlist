@@ -57,7 +57,7 @@ class TodoRepositorySqflite extends TodoRepository {
   TodoRepositorySqflite._internal();
 
   @override
-  Future<int> addTodoList(TodoList list) => listDao.addTodoList(list);
+  Future<TodoList> addTodoList(TodoList list) => listDao.addTodoList(list);
 
   @override
   Future<void> updateTodoList(TodoList list) => listDao.updateTodoList(list);

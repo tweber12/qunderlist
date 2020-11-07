@@ -5,7 +5,6 @@ import 'package:qunderlist/blocs/repeated.dart';
 import 'package:qunderlist/notification_ffi.dart';
 import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
-import 'package:qunderlist/repository/todos_repository_sqflite.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

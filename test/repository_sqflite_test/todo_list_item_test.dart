@@ -38,13 +38,9 @@ void main() {
 
       // Set up two lists
       lists = [
-        TodoList("first list", Palette.blue),
-        TodoList("second list", Palette.yellow)
+        await repository.addTodoList(TodoList("first list", Palette.blue)),
+        await repository.addTodoList(TodoList("second list", Palette.yellow))
       ];
-      for (int i=0; i<lists.length; i++) {
-        var id = await repository.addTodoList(lists[i]);
-        lists[i] = lists[i].withId(id);
-      }
 
       // Add items to the first list
       items = List();
@@ -336,7 +332,7 @@ void main() {
       var listDao = await TodoListDao.getInstance(db);
       var itemDao = TodoItemDao(db);
 
-      listId = await listDao.addTodoList(TodoList("test", Palette.yellow));
+      listId = (await listDao.addTodoList(TodoList("test", Palette.yellow))).id;
 
       // Add items to the first list
       items = List();

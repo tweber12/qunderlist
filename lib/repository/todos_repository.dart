@@ -42,7 +42,7 @@ abstract class TodoRepository {
 
 
   // Functions accessing lists
-  Future<int> addTodoList(TodoList list);
+  Future<TodoList> addTodoList(TodoList list);
   Future<void> updateTodoList(TodoList list);
   Future<void> deleteTodoList(int listId);
   Future<void> moveTodoList(int listId, int moveTo);

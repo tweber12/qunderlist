@@ -28,13 +28,13 @@ class TodoListDao {
     return todoListDao;
   }
   
-  Future<int> addTodoList(TodoList list) async {
+  Future<TodoList> addTodoList(TodoList list) async {
     // We need to increment maxOrdering here and store it, since the function could be interrupted at the await
     // This way, we keep the correct value and make sure that all other inserts start with the incremented one
     _maxOrdering += 1;
     var ordering = _maxOrdering;
     int id = await _db.insert(TODO_LISTS_TABLE, todoListToRepresentation(list, ordering: ordering));
-    return id;
+    return list.withId(id);
   }
 
   Future<void> updateTodoList(TodoList list) async {

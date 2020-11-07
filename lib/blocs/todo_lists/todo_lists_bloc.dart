@@ -71,8 +71,8 @@ class TodoListsBloc<R extends TodoRepository> extends Bloc<TodoListsEvents, Todo
 
   Stream<TodoListsStates> _mapTodoListAddedEventToState(TodoListAddedEvent event) async* {
     await _writeMutex.acquire();
-    int id = await _repository.addTodoList(event.list);
-    cache = cache.addElementAtEnd(event.list.withId(id));
+    TodoList newList = await _repository.addTodoList(event.list);
+    cache = cache.addElementAtEnd(newList);
     yield TodoListsLoaded(cache, numberOfItems, numberOfOverdueItems);
     _writeMutex.release();
   }

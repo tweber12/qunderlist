@@ -38,8 +38,7 @@ void main() {
       TodoList("jkldaf", Palette.indigo),
     ];
     for (int i=0; i<lists.length; i++) {
-      var id = await repository.addTodoList(lists[i]);
-      lists[i] = lists[i].withId(id);
+      lists[i] = await repository.addTodoList(lists[i]);
     }
     items = List();
     items.add(TodoItem("first item", now, onLists: [lists[0]]));
@@ -86,9 +85,7 @@ void main() {
   });
 
   test('add item onList', () async {
-    var list = TodoList("Main list", Palette.grey);
-    var listId = await repository.addTodoList(list);
-    list = list.withId(listId);
+    var list = await repository.addTodoList(TodoList("Main list", Palette.grey));
     var item = TodoItem(
       "Item title", DateTime.now()
     );

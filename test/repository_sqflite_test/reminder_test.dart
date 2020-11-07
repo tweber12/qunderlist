@@ -161,11 +161,11 @@ void main() {
   test("get reminders for list", () async {
     var itemId1 = itemIds[0];
     var itemId2 = itemIds[2];
-    int listId = await repository.addTodoList(TodoList("test", Palette.amber));
-    repository.addTodoItemToList(itemId1, listId);
-    repository.addTodoItemToList(itemId2, listId);
+    var list = await repository.addTodoList(TodoList("test", Palette.amber));
+    repository.addTodoItemToList(itemId1, list.id);
+    repository.addTodoItemToList(itemId2, list.id);
     var now = DateTime.now();
-    var resultReminders = await repository.getActiveRemindersForList(listId);
+    var resultReminders = await repository.getActiveRemindersForList(list.id);
     var active = (reminders[itemId1]+reminders[itemId2]).where((element) => element.at.isAfter(now)).toList();
     expect(resultReminders.length, active.length);
     for (final item in active) {
