@@ -315,6 +315,7 @@ void main() {
         verify(ffi.setReminder(next, nextReminders[0]));
         verify(ffi.setReminder(next, nextReminders[1]));
         verify(ffi.setPendingItemAlarm(alarmId(next.id), next.id, next.dueDate.add(Duration(days: 1))));
+        verify(repository.triggerUpdate());
         verifyNoMoreInteractions(repository);
       });
 
@@ -353,6 +354,7 @@ void main() {
         verify(ffi.setReminder(next, nextReminders[0]));
         verify(ffi.setReminder(next, nextReminders[1]));
         verify(ffi.setPendingItemAlarm(alarmId(next.id), next.id, next.dueDate.add(Duration(days: 1))));
+        verify(repository.triggerUpdate());
         verifyNoMoreInteractions(repository);
       });
 
@@ -389,6 +391,7 @@ void main() {
         verify(ffi.setReminder(next, nextReminders[0]));
         verify(ffi.setReminder(next, nextReminders[1]));
         verify(ffi.setPendingItemAlarm(alarmId(next.id), next.id, next.dueDate.add(Duration(days: 1))));
+        verify(repository.triggerUpdate());
         verifyNoMoreInteractions(repository);
       });
     });
