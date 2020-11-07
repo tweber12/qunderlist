@@ -20,11 +20,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
-import androidx.core.app.AlarmManagerCompat
 import androidx.core.app.NotificationManagerCompat
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.sync.Mutex
+import java.util.*
 
 const val NOTIFICATION_FFI_CHANNEL_NAME = "com.torweb.qunderlist.notification_ffi_channel"
 const val NOTIFICATION_FFI_BG_CHANNEL_NAME = "com.torweb.qunderlist.notification_ffi_background_channel"
@@ -139,7 +139,7 @@ class NotificationFFI(private val context: Context, binaryMessenger: BinaryMesse
         }
         if (isNotificationRegistered(context, reminderId)) {
             showNotification(context, reminderId, itemId, itemTitle, itemNote)
-        } else {
+        } else if (Date(reminderTime).after(Date())){
             setAlarm(context, reminderId, reminderTime, itemId, itemTitle, itemNote)
         }
     }
