@@ -102,6 +102,7 @@ class NotificationHandler {
       }
     }
     var next = await repository.addTodoItem(nextItem(item));
+    repository.triggerUpdate();
     await _replaceRemindersForPendingItem(item, next);
     await setPendingItem(next);
   }
