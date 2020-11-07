@@ -90,6 +90,11 @@ class NotificationHandler {
       }
       await _notificationFFI.setReminder(item, r);
     }
+    var autoCompleting = await repository.getPendingItems();
+    for (final i in autoCompleting) {
+      var item = await repository.getTodoItem(i);
+      await setPendingItem(item);
+    }
   }
 
   Future<void> _createNext(int itemId) async {

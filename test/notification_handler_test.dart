@@ -259,14 +259,16 @@ void main() {
           Reminder(DateTime.now().add(Duration(hours: 5)), id: 7),
           Reminder(DateTime.now().subtract(Duration(hours: 1)), id: 8),
           Reminder(DateTime.now().add(Duration(hours: 5)), id: 2),
-          Reminder(DateTime.now().subtract(Duration(days: 25)), id: 4),
+          Reminder(DateTime.now().subtract(Duration(days: 9)), id: 4),
         ];
         var items = [
           TodoItem("first item", DateTime.now(), reminders: [reminders[0], reminders[3]], id: 1),
           TodoItem("second item", DateTime.now(), completedOn: DateTime.now(), reminders: [reminders[1]], id: 2),
-          TodoItem("third item", DateTime.now(), reminders: [reminders[4], reminders[2]], id: 3),
+          TodoItem("third item", DateTime.now(), dueDate: DateTime.now(), reminders: [reminders[4], reminders[2]], id: 3, repeated: Repeated(true, true, false, true, RepeatedStepDaily(30))),
         ];
-        when(repository.getActiveReminders()).thenAnswer((realInvocation) => Future.value(reminders));
+        var pending = items[2];
+        when(repository.getActiveReminders()).thenAnswer((_) => Future.value(reminders));
+        when(repository.getPendingItems()).thenAnswer((_) => Future.value([pending.id]));
         when(repository.getItemOfReminder(reminders[0].id)).thenAnswer((_) => Future.value(items[0].id));
         when(repository.getItemOfReminder(reminders[1].id)).thenAnswer((_) => Future.value(items[1].id));
         when(repository.getItemOfReminder(reminders[2].id)).thenAnswer((_) => Future.value(items[2].id));
@@ -280,6 +282,10 @@ void main() {
         verify(ffi.setReminder(items[2], reminders[2]));
         verify(ffi.setReminder(items[0], reminders[3]));
         verify(ffi.setReminder(items[2], reminders[4]));
+        verify(ffi.setPendingItemAlarm(alarmId(pending.id), pending.id, any));
+        var next = nextItem(pending);
+        verify(ffi.setReminder(any, next.reminders[0].withId(reminderId(pending.reminders[0].id))));
+        verify(ffi.setReminder(any, next.reminders[1].withId(reminderId(pending.reminders[1].id))));
         verifyNoMoreInteractions(ffi);
       });
 
