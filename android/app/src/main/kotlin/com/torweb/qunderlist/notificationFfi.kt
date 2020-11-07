@@ -128,9 +128,9 @@ class NotificationFFI(private val context: Context, binaryMessenger: BinaryMesse
         }
     }
 
-    private fun setReminder(args: Map<String, Any>) {
+    private fun setReminder(args: Map<String, Any>, keepSnooze: Boolean = false) {
         val reminderId = args[NOTIFICATION_FFI_REMINDER_ID]?.let { ffiInt(it) }
-        val reminderTime = args[NOTIFICATION_FFI_REMINDER_TIME]?.let { ffiInt(it) }
+        var reminderTime = args[NOTIFICATION_FFI_REMINDER_TIME]?.let { ffiInt(it) }
         val itemId = args[NOTIFICATION_FFI_ITEM_ID]?.let { ffiInt(it) }
         val itemTitle = args[NOTIFICATION_FFI_ITEM_TITLE] as String
         val itemNote = args[NOTIFICATION_FFI_ITEM_NOTE] as String? ?: ""
@@ -139,13 +139,21 @@ class NotificationFFI(private val context: Context, binaryMessenger: BinaryMesse
         }
         if (isNotificationRegistered(context, reminderId)) {
             showNotification(context, reminderId, itemId, itemTitle, itemNote)
-        } else if (Date(reminderTime).after(Date())){
-            setAlarm(context, reminderId, reminderTime, itemId, itemTitle, itemNote)
+        } else {
+            if (keepSnooze) {
+                val snoozed: Long = getSnoozedTime(context, reminderId)
+                if (snoozed != 0L) {
+                    reminderTime = snoozed
+                }
+            }
+            if (Date(reminderTime).after(Date())){
+                setAlarm(context, reminderId, reminderTime, itemId, itemTitle, itemNote)
+            }
         }
     }
 
     private fun updateReminder(args: Map<String, Any>) {
-        return setReminder(args)
+        return setReminder(args, keepSnooze = true)
     }
 
     private fun deleteReminder(reminderId: Any) {

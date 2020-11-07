@@ -40,6 +40,7 @@ const val ITEM_NOTE_EXTRA = "item_note"
 
 const val SHARED_PREFERENCES = "notification_service_preferences"
 const val SHARED_PREFERENCES_NOTIFICATION_PREFIX = "notification"
+const val SHARED_PREFERENCES_SNOOZE_PREFIX = "snooze"
 
 const val ACTION_OPEN = "com.torweb.qunderlist.open"
 const val ACTION_SNOOZE = "com.torweb.qunderlist.snooze"
@@ -103,6 +104,7 @@ class NotificationReceiver: BroadcastReceiver() {
         with(NotificationManagerCompat.from(context)) {
             cancel(reminderId.toInt())
             unRegisterNotification(context, reminderId)
+            unSetSnoozeTime(context, reminderId)
         }
     }
 
@@ -124,6 +126,7 @@ class NotificationReceiver: BroadcastReceiver() {
         val intent = Intent(context, AlarmService::class.java).setAction(ACTION_SHOW_NOTIFICATION).putExtra(REMINDER_ID_EXTRA, reminderId)
         val pendingIntent: PendingIntent = PendingIntent.getBroadcast(context, reminderId.toInt(), intent, PendingIntent.FLAG_UPDATE_CURRENT)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        setSnoozedTime(context, reminderId, time.timeInMillis)
         AlarmManagerCompat.setExactAndAllowWhileIdle(
                 alarmManager,
                 AlarmManager.RTC_WAKEUP,
@@ -221,4 +224,16 @@ fun isNotificationRegistered(context: Context, id: Long): Boolean {
 
 fun unRegisterNotification(context: Context, id: Long) {
     context.getSharedPreferences(SHARED_PREFERENCES, Context.MODE_PRIVATE).edit().remove("${SHARED_PREFERENCES_NOTIFICATION_PREFIX}_$id").apply()
+}
+
+fun setSnoozedTime(context: Context, reminderId: Long, time: Long) {
+    context.getSharedPreferences(SHARED_PREFERENCES, Context.MODE_PRIVATE).edit().putLong("${SHARED_PREFERENCES_SNOOZE_PREFIX}_$reminderId", time).apply()
+}
+
+fun getSnoozedTime(context: Context, reminderId: Long): Long {
+    return context.getSharedPreferences(SHARED_PREFERENCES, Context.MODE_PRIVATE).getLong("${SHARED_PREFERENCES_SNOOZE_PREFIX}_$reminderId", 0)
+}
+
+fun unSetSnoozeTime(context: Context, reminderId: Long) {
+    context.getSharedPreferences(SHARED_PREFERENCES, Context.MODE_PRIVATE).edit().remove("${SHARED_PREFERENCES_SNOOZE_PREFIX}_$reminderId").apply()
 }

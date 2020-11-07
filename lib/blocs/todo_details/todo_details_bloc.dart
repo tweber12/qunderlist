@@ -20,7 +20,6 @@ import 'package:qunderlist/blocs/repeated.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_events.dart';
 import 'package:qunderlist/blocs/todo_details/todo_details_states.dart';
 import 'package:qunderlist/blocs/todo_list.dart';
-import 'package:qunderlist/notification_ffi.dart';
 import 'package:qunderlist/notification_handler.dart';
 import 'package:qunderlist/repository/repository.dart';
 
@@ -243,7 +242,7 @@ class TodoDetailsBloc<R extends TodoRepository> extends Bloc<TodoDetailsEvent,To
     yield TodoDetailsFullyLoaded(_fullItem, _listBloc.color);
     _notifyList();
     await _repository.updateReminder(event.reminder.id, event.reminder.at);
-    _notificationHandler.updateReminder(_fullItem, event.reminder);
+    _notificationHandler.setReminder(_fullItem, event.reminder);
     _notificationHandler.setPendingItem(_fullItem);
     _writeMutex.release();
   }
